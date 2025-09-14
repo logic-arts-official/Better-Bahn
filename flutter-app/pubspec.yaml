@@ -10,26 +10,31 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Factor 4: Backing services - HTTP client for API communication
   http: ^1.1.0
+  # Factor 12: Admin processes - URL launcher for booking links
   url_launcher: ^6.1.12
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Factor 11: Logs - Linting for code quality
   flutter_lints: ^5.0.0
+  # Factor 12: Admin processes - App icons
   flutter_launcher_icons: ^0.13.1
-  flutter_svg: ^2.0.9  # Added for SVG support
+  # Factor 4: Backing services - SVG support for icons
+  flutter_svg: ^2.0.9
 
 # Flutter launcher icons configuration
 flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path_android: "assets/icon/app_icon.png"  # PNG fallback for Android
-  image_path_ios: "assets/icon/icon_ios.png"  # PNG fallback for iOS
+  image_path_android: "assets/icon/app_icon.png"
+  image_path_ios: "assets/icon/icon_ios.png"
   adaptive_icon_background: "#EC0016"  # DB Red color
-  adaptive_icon_foreground: "assets/icon/app_icon.png"  # PNG for adaptive icon foreground
-  # SVG support
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  # SVG support for web and desktop
   web:
     generate: false
   windows:
@@ -40,13 +45,7 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # Add your assets here
+  # Factor 12: Admin processes - Asset management
   assets:
     - assets/icon/
     # Add other asset folders as needed
-
-  # Uncomment and add custom fonts if needed
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf

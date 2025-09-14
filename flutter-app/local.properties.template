@@ -1,0 +1,31 @@
+# Flutter Local Development Configuration
+# Copy this file to android/local.properties for local development
+# 
+# Factor 3: Config - Local development environment variables
+# These settings will be used when running flutter run or debugging locally
+
+# Environment configuration
+ENVIRONMENT=development
+
+# API Configuration
+BAHN_API_BASE_URL=https://www.bahn.de/web/api
+DEFAULT_REQUEST_TIMEOUT=30000
+DEFAULT_DELAY_MS=500
+
+# User Agent for HTTP requests
+USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36
+
+# Logging configuration
+LOG_LEVEL=debug
+ENABLE_DEBUG_LOGS=true
+ENABLE_ADVANCED_LOGGING=true
+
+# Feature flags
+ENABLE_DEBUG_MENU=true
+
+# Build information (will be overridden by CI/CD)
+BUILD_NUMBER=1
+VERSION=1.0.0
+
+# Note: Do not commit this file with actual credentials or sensitive data
+# Use --dart-define flags for CI/CD and production builds

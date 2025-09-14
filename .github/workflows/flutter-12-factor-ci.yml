@@ -1,0 +1,205 @@
+name: Flutter Android 12-Factor CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Factor 5: Build/Release/Run separation
+jobs:
+  # Factor 2: Dependencies - Check dependency integrity
+  analyze:
+    name: Analyze Dependencies & Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.8.1'
+          channel: 'stable'
+          
+      - name: Verify Dependencies
+        working-directory: flutter-app
+        run: |
+          flutter pub get
+          flutter pub deps
+          
+      - name: Run Flutter Doctor
+        working-directory: flutter-app
+        run: flutter doctor -v
+        
+      - name: Analyze Code Quality
+        working-directory: flutter-app
+        run: flutter analyze
+
+  # Factor 10: Dev/Prod Parity - Consistent testing across environments
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+    needs: analyze
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.8.1'
+          channel: 'stable'
+          
+      - name: Install Dependencies
+        working-directory: flutter-app
+        run: flutter pub get
+        
+      - name: Run Tests
+        working-directory: flutter-app
+        run: flutter test
+
+  # Factor 5: Build separation with different configurations
+  build-debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    needs: [analyze, test]
+    if: github.ref != 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.8.1'
+          channel: 'stable'
+          
+      - name: Install Dependencies
+        working-directory: flutter-app
+        run: flutter pub get
+        
+      - name: Build Debug APK
+        working-directory: flutter-app
+        run: |
+          flutter build apk --debug \
+            --dart-define=ENVIRONMENT=development \
+            --dart-define=ENABLE_DEBUG_LOGS=true \
+            --dart-define=ENABLE_DEBUG_MENU=true
+            
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-apk
+          path: flutter-app/build/app/outputs/flutter-apk/app-debug.apk
+
+  # Factor 5: Release build with production configuration
+  build-release:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    needs: [analyze, test]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.8.1'
+          channel: 'stable'
+          
+      - name: Install Dependencies
+        working-directory: flutter-app
+        run: flutter pub get
+        
+      - name: Build Release APK
+        working-directory: flutter-app
+        run: |
+          flutter build apk --release \
+            --dart-define=ENVIRONMENT=production \
+            --dart-define=ENABLE_DEBUG_LOGS=false \
+            --dart-define=ENABLE_DEBUG_MENU=false \
+            --dart-define=LOG_LEVEL=error
+            
+      - name: Build App Bundle (AAB)
+        working-directory: flutter-app
+        run: |
+          flutter build appbundle --release \
+            --dart-define=ENVIRONMENT=production \
+            --dart-define=ENABLE_DEBUG_LOGS=false \
+            --dart-define=ENABLE_DEBUG_MENU=false \
+            --dart-define=LOG_LEVEL=error
+            
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-apk
+          path: flutter-app/build/app/outputs/flutter-apk/app-release.apk
+          
+      - name: Upload App Bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-aab
+          path: flutter-app/build/app/outputs/bundle/release/app-release.aab
+
+  # Factor 12: Admin processes - Configuration validation
+  validate-config:
+    name: Validate 12-Factor Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Gradle Wrapper
+        run: |
+          if [ ! -f "flutter-app/android/gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "❌ Gradle wrapper not checked in (Factor 2)"
+            exit 1
+          else
+            echo "✅ Gradle wrapper properly checked in (Factor 2)"
+          fi
+          
+      - name: Validate Build Configuration
+        run: |
+          if grep -q "dart.env" flutter-app/android/app/build.gradle.kts; then
+            echo "✅ Build-time configuration injection implemented (Factor 3)"
+          else
+            echo "❌ Missing build-time configuration (Factor 3)"
+            exit 1
+          fi
+          
+      - name: Check Environment Separation
+        working-directory: flutter-app
+        run: |
+          if [ -f "lib/config/app_config.dart" ]; then
+            echo "✅ Environment abstraction implemented (Factor 3)"
+          else
+            echo "❌ Missing environment abstraction (Factor 3)"
+            exit 1
+          fi
+          
+      - name: Validate Service Abstraction
+        working-directory: flutter-app
+        run: |
+          if [ -f "lib/services/bahn_api_service.dart" ]; then
+            echo "✅ Service abstraction implemented (Factor 4)"
+          else
+            echo "❌ Missing service abstraction (Factor 4)"
+            exit 1
+          fi
+          
+      - name: Check Logging Implementation
+        working-directory: flutter-app
+        run: |
+          if [ -f "lib/services/logging_service.dart" ]; then
+            echo "✅ Structured logging implemented (Factor 11)"
+          else
+            echo "❌ Missing structured logging (Factor 11)"
+            exit 1
+          fi
+          
+      - name: Validate Debug Menu
+        working-directory: flutter-app
+        run: |
+          if [ -f "lib/debug/debug_menu.dart" ]; then
+            echo "✅ Admin processes implemented (Factor 12)"
+          else
+            echo "❌ Missing admin processes (Factor 12)"
+            exit 1
+          fi
