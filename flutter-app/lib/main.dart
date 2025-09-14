@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
+import 'design_system/db_theme.dart';
+import 'design_system/db_components.dart';
 
 void main() {
   runApp(const SplitTicketApp());
@@ -18,28 +20,8 @@ class SplitTicketApp
     return MaterialApp(
       title: 'Better Bahn',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(
-              seedColor: const Color(
-                0xFFEC0016,
-              ), // DB Red
-              brightness:
-                  Brightness.light,
-            ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(
-              seedColor: const Color(
-                0xFFEC0016,
-              ), // DB Red
-              brightness:
-                  Brightness.dark,
-            ),
-        useMaterial3: true,
-      ),
+      theme: DBTheme.lightTheme,
+      darkTheme: DBTheme.darkTheme,
       themeMode: ThemeMode.system,
       home: const HomePage(),
     );
@@ -226,14 +208,10 @@ class _HomePageState
     String url,
   ) async {
     if (url.isEmpty) {
-      ScaffoldMessenger.of(
+      DBSnackBar.show(
         context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Bitte gib einen DB-Link ein',
-          ),
-        ),
+        message: 'Bitte gib einen DB-Link ein',
+        type: DBSnackBarType.warning,
       );
       return;
     }
@@ -1100,14 +1078,10 @@ class _HomePageState
       mode: LaunchMode
           .externalApplication,
     )) {
-      ScaffoldMessenger.of(
+      DBSnackBar.show(
         context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Konnte URL nicht öffnen: $url',
-          ),
-        ),
+        message: 'Konnte URL nicht öffnen: $url',
+        type: DBSnackBarType.error,
       );
     }
   }
@@ -1129,338 +1103,150 @@ class _HomePageState
       body: SingleChildScrollView(
         controller: _scrollController,
         child: Padding(
-          padding: const EdgeInsets.all(
-            16.0,
-          ),
+          padding: const EdgeInsets.all(DBSpacing.md),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // URL input field
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller:
-                          _urlController,
-                      decoration: InputDecoration(
-                        labelText:
-                            'DB-Link einfügen',
-                        hintText:
-                            'https://www.bahn.de/buchung/start?vbid=...',
-                        border:
-                            const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: const Icon(
-                            Icons.clear,
-                          ),
-                          onPressed: () {
-                            _urlController
-                                .clear();
-                          },
-                        ),
-                      ),
-                      keyboardType:
-                          TextInputType
-                              .url,
+              DBTextField(
+                label: 'DB-Link',
+                hint: 'https://www.bahn.de/buchung/start?vbid=...',
+                controller: _urlController,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _urlController.clear();
+                      },
                     ),
-                  ),
-                  const SizedBox(
-                    width: 8,
-                  ),
-                  IconButton(
-                    onPressed: () async {
-                      final data =
-                          await Clipboard.getData(
-                            'text/plain',
-                          );
-                      if (data !=
-                              null &&
-                          data.text !=
-                              null) {
-                        final text =
-                            data.text!;
-                        if (text
-                            .contains(
-                              'bahn.de',
-                            )) {
-                          setState(() {
-                            _urlController
-                                    .text =
-                                text;
-                          });
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Link aus Zwischenablage eingefügt',
-                              ),
-                            ),
-                          );
+                    IconButton(
+                      onPressed: () async {
+                        final data = await Clipboard.getData('text/plain');
+                        if (data != null && data.text != null) {
+                          final text = data.text!;
+                          if (text.contains('bahn.de')) {
+                            setState(() {
+                              _urlController.text = text;
+                            });
+                            DBSnackBar.show(
+                              context,
+                              message: 'Link aus Zwischenablage eingefügt',
+                              type: DBSnackBarType.success,
+                            );
+                          }
                         }
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.paste,
+                      },
+                      icon: const Icon(Icons.paste),
+                      tooltip: 'Aus Zwischenablage einfügen',
                     ),
-                    tooltip:
-                        'Aus Zwischenablage einfügen',
-                  ),
-                ],
+                  ],
+                ),
+                keyboardType: TextInputType.url,
               ),
 
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: DBSpacing.md),
 
               // Options section
-              Card(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.all(
-                        12.0,
+              DBCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reisende & Rabatte',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
-                    children: [
-                      const Text(
-                        'Reisende & Rabatte',
-                        style: TextStyle(
-                          fontWeight:
-                              FontWeight
-                                  .bold,
-                          fontSize: 16,
+                    ),
+                    const SizedBox(height: DBSpacing.md),
+
+                    // Age and Delay input
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: DBTextField(
+                            label: 'Alter',
+                            controller: _ageController,
+                            keyboardType: TextInputType.number,
+                          ),
                         ),
-                      ),
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      // Age and Delay input
-                      Row(
-                        children: [
-                          const Text(
-                            'Alter:',
+                        const SizedBox(width: DBSpacing.md),
+                        Expanded(
+                          flex: 3,
+                          child: DBTextField(
+                            label: 'Delay (ms)',
+                            controller: _delayController,
+                            keyboardType: TextInputType.number,
                           ),
-                          const SizedBox(
-                            width: 8,
-                          ),
-                          SizedBox(
-                            width: 60,
-                            child: TextField(
-                              controller:
-                                  _ageController,
-                              keyboardType:
-                                  TextInputType
-                                      .number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter
-                                    .digitsOnly,
-                              ],
-                              decoration: const InputDecoration(
-                                border:
-                                    OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal:
-                                      8,
-                                  vertical:
-                                      8,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 16,
-                          ),
-                          const Text(
-                            'Delay (ms):',
-                          ),
-                          const SizedBox(
-                            width: 8,
-                          ),
-                          SizedBox(
-                            width: 80,
-                            child: TextField(
-                              controller:
-                                  _delayController,
-                              keyboardType:
-                                  TextInputType
-                                      .number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter
-                                    .digitsOnly,
-                              ],
-                              decoration: const InputDecoration(
-                                border:
-                                    OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal:
-                                      8,
-                                  vertical:
-                                      8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      // Deutschland-Ticket checkbox
-                      CheckboxListTile(
-                        title: const Text(
-                          'Deutschland-Ticket',
                         ),
-                        value:
-                            _hasDeutschlandTicket,
-                        onChanged: (value) {
-                          setState(() {
-                            _hasDeutschlandTicket =
-                                value ??
-                                false;
-                          });
-                        },
-                        controlAffinity:
-                            ListTileControlAffinity
-                                .leading,
-                        contentPadding:
-                            EdgeInsets
-                                .zero,
-                        dense: true,
-                      ),
+                      ],
+                    ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                    const SizedBox(height: DBSpacing.md),
 
-                      // BahnCard dropdown
-                      DropdownButtonFormField<
-                        String?
-                      >(
-                        decoration: const InputDecoration(
-                          labelText:
-                              'BahnCard',
-                          border:
-                              OutlineInputBorder(),
-                          contentPadding:
-                              EdgeInsets.symmetric(
-                                horizontal:
-                                    12,
-                                vertical:
-                                    12,
-                              ),
-                        ),
-                        value:
-                            _selectedBahnCard,
-                        items: _bahnCardOptions.map((
-                          option,
-                        ) {
-                          return DropdownMenuItem<
-                            String?
-                          >(
-                            value:
-                                option['value'],
-                            child: Text(
-                              option['label']!,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedBahnCard =
-                                value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
+                    // Deutschland-Ticket checkbox
+                    DBCheckbox(
+                      value: _hasDeutschlandTicket,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasDeutschlandTicket = value ?? false;
+                        });
+                      },
+                      label: 'Deutschland-Ticket',
+                      description: 'Regionalverkehr bereits abgedeckt',
+                    ),
+
+                    const SizedBox(height: DBSpacing.md),
+
+                    // BahnCard dropdown
+                    DBDropdown<String?>(
+                      label: 'BahnCard',
+                      value: _selectedBahnCard,
+                      hint: 'BahnCard auswählen',
+                      items: _bahnCardOptions.map((option) {
+                        return DBDropdownItem<String?>(
+                          value: option['value'],
+                          label: option['label']!,
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedBahnCard = value;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: DBSpacing.md),
 
               // Search button
-              ElevatedButton.icon(
-                onPressed: _isLoading
-                    ? null
-                    : () => _analyzeUrl(
-                        _urlController
-                            .text,
-                      ),
-                icon: const Icon(
-                  Icons.search,
-                ),
-                label: const Text(
-                  'Verbindung analysieren',
-                ),
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(
-                        vertical: 12,
-                      ),
-                ),
+              DBButton(
+                text: 'Verbindung analysieren',
+                icon: Icons.search,
+                onPressed: _isLoading ? null : () => _analyzeUrl(_urlController.text),
+                isLoading: _isLoading,
+                type: DBButtonType.primary,
+                size: DBButtonSize.large,
               ),
 
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: DBSpacing.md),
 
               // Progress indicator during loading
               if (_isLoading) ...[
                 Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LinearProgressIndicator(
-                            value:
-                                _progress >
-                                    0
-                                ? _progress
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 8,
-                        ),
-                        Text(
-                          '$_processedStations/$_totalStations (${(_progress * 100).toInt()}%)',
-                          style:
-                              const TextStyle(
-                                fontSize:
-                                    12,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(
-                      height: 8,
-                    ),
-                    Text(
-                      'Suche nach günstigeren Split-Tickets...',
-                      style:
-                          const TextStyle(
-                            fontSize:
-                                14,
-                          ),
+                    DBProgressIndicator(
+                      value: _progress > 0 ? _progress : null,
+                      label: 'Suche nach günstigeren Split-Tickets... ($_processedStations/$_totalStations - ${(_progress * 100).toInt()}%)',
                     ),
                   ],
                 ),
-                const SizedBox(
-                  height: 16,
-                ),
+                const SizedBox(height: DBSpacing.md),
               ],
 
               // Results or welcome message
@@ -1468,26 +1254,19 @@ class _HomePageState
                   ? _buildLogsSection()
                   : _hasResult
                   ? _buildResultsSection()
-                  : _logMessages
-                        .isNotEmpty
+                  : _logMessages.isNotEmpty
                   ? _buildLogsSection()
-                  : const Center(
+                  : Center(
                       child: Padding(
-                        padding:
-                            EdgeInsets.all(
-                              32.0,
-                            ),
+                        padding: const EdgeInsets.all(DBSpacing.xl),
                         child: Text(
                           'Füge einen DB-Link ein, um günstigere Split-Ticket-Optionen zu finden.\n\n'
                           'Unterstützte Links:\n'
                           '• Kurze Links: https://www.bahn.de/buchung/start?vbid=...\n'
                           '• Lange Links: https://www.bahn.de/...',
-                          textAlign:
-                              TextAlign
-                                  .center,
-                          style: TextStyle(
-                            color: Colors
-                                .grey,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: DBColors.dbGray500,
                           ),
                         ),
                       ),
@@ -1503,109 +1282,62 @@ class _HomePageState
     return Column(
       children: [
         // Collapsible logs section
-        InkWell(
+        DBCard(
           onTap: () {
             setState(() {
               _showLogs = !_showLogs;
             });
           },
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 12,
-                ),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceVariant,
-              borderRadius:
-                  BorderRadius.circular(
-                    8,
-                  ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _showLogs
-                      ? Icons
-                            .keyboard_arrow_up
-                      : Icons
-                            .keyboard_arrow_down,
-                  size: 20,
-                ),
-                const SizedBox(
-                  width: 8,
-                ),
-                const Text(
-                  'Logs anzeigen/ausblenden',
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          child: Row(
+            children: [
+              Icon(
+                _showLogs ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                size: 20,
+              ),
+              const SizedBox(width: DBSpacing.sm),
+              Text(
+                'Logs anzeigen/ausblenden',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: DBSpacing.sm),
 
         // Logs content (collapsible)
         if (_showLogs)
           SizedBox(
             height: 300,
-            child: LogConsole(
-              messages: _logMessages,
-            ),
+            child: LogConsole(messages: _logMessages),
           ),
 
         // If we have results and logs are shown, show a compact result
         if (_hasResult && _showLogs)
-          Card(
-            margin:
-                const EdgeInsets.only(
-                  top: 8,
+          DBCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _resultText,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-            child: Padding(
-              padding:
-                  const EdgeInsets.all(
-                    12,
-                  ),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
-                children: [
+                const SizedBox(height: DBSpacing.sm),
+                Text(
+                  'Direktpreis: ${_directPrice.toStringAsFixed(2)} €',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (_splitPrice < _directPrice)
                   Text(
-                    _resultText,
-                    style:
-                        const TextStyle(
-                          fontWeight:
-                              FontWeight
-                                  .bold,
-                          fontSize: 16,
-                        ),
-                  ),
-                  const SizedBox(
-                    height: 8,
-                  ),
-                  Text(
-                    'Direktpreis: ${_directPrice.toStringAsFixed(2)} €',
-                  ),
-                  if (_splitPrice <
-                      _directPrice)
-                    Text(
-                      'Split-Preis: ${_splitPrice.toStringAsFixed(2)} € (Ersparnis: ${(_directPrice - _splitPrice).toStringAsFixed(2)} €)',
-                      style: const TextStyle(
-                        color: Colors
-                            .green,
-                        fontWeight:
-                            FontWeight
-                                .bold,
-                      ),
+                    'Split-Preis: ${_splitPrice.toStringAsFixed(2)} € (Ersparnis: ${(_directPrice - _splitPrice).toStringAsFixed(2)} €)',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: DBColors.dbSuccess,
+                      fontWeight: FontWeight.bold,
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
       ],
@@ -1616,168 +1348,94 @@ class _HomePageState
     return Column(
       children: [
         // Result summary card
-        Card(
+        DBCard(
           elevation: 4,
-          child: Padding(
-            padding:
-                const EdgeInsets.all(
-                  16.0,
-                ),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _splitPrice <
-                              _directPrice
-                          ? Icons
-                                .check_circle
-                          : Icons.info,
-                      color:
-                          _splitPrice <
-                              _directPrice
-                          ? Colors.green
-                          : Colors
-                                .orange,
-                      size: 28,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _splitPrice < _directPrice ? Icons.check_circle : Icons.info,
+                    color: _splitPrice < _directPrice ? DBColors.dbSuccess : DBColors.dbWarning,
+                    size: 28,
+                  ),
+                  const SizedBox(width: DBSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      _resultText,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(
-                      width: 8,
-                    ),
-                    Expanded(
-                      child: Text(
-                        _resultText,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight:
-                              FontWeight
-                                  .bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(
-                  height: 24,
-                ),
-                PriceComparison(
-                  directPrice:
-                      _directPrice,
-                  splitPrice:
-                      _splitPrice,
-                  savings:
-                      _directPrice -
-                      _splitPrice,
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              const Divider(height: DBSpacing.lg),
+              PriceComparison(
+                directPrice: _directPrice,
+                splitPrice: _splitPrice,
+                savings: _directPrice - _splitPrice,
+              ),
+            ],
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: DBSpacing.md),
 
         // Logs toggle
-        InkWell(
+        DBCard(
           onTap: () {
             setState(() {
               _showLogs = !_showLogs;
             });
           },
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 12,
-                ),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceVariant,
-              borderRadius:
-                  BorderRadius.circular(
-                    8,
-                  ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _showLogs
-                      ? Icons
-                            .keyboard_arrow_up
-                      : Icons
-                            .keyboard_arrow_down,
-                  size: 20,
-                ),
-                const SizedBox(
-                  width: 8,
-                ),
-                const Text(
-                  'Logs anzeigen/ausblenden',
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          child: Row(
+            children: [
+              Icon(
+                _showLogs ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                size: 20,
+              ),
+              const SizedBox(width: DBSpacing.sm),
+              Text(
+                'Logs anzeigen/ausblenden',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ],
           ),
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: DBSpacing.sm),
 
         // Either show logs or tickets
         _showLogs
             ? SizedBox(
                 height: 300,
-                child: LogConsole(
-                  messages:
-                      _logMessages,
-                ),
+                child: LogConsole(messages: _logMessages),
               )
             : _splitPrice < _directPrice
             ? Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Empfohlene Tickets:',
-                    style: TextStyle(
-                      fontWeight:
-                          FontWeight
-                              .bold,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(
-                    height: 8,
-                  ),
+                  const SizedBox(height: DBSpacing.sm),
                   ListView.builder(
                     shrinkWrap: true,
-                    physics:
-                        const NeverScrollableScrollPhysics(),
-                    itemCount:
-                        _splitTickets
-                            .length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _splitTickets.length,
                     itemBuilder: (context, index) {
-                      final ticket =
-                          _splitTickets[index];
+                      final ticket = _splitTickets[index];
                       return TicketCard(
                         ticket: ticket,
-                        index:
-                            index + 1,
+                        index: index + 1,
                         onBookPressed: () {
-                          if (!ticket
-                              .coveredByDeutschlandTicket) {
-                            final bookingLink =
-                                _generateBookingLink(
-                                  ticket,
-                                );
-                            _launchUrl(
-                              bookingLink,
-                            );
+                          if (!ticket.coveredByDeutschlandTicket) {
+                            final bookingLink = _generateBookingLink(ticket);
+                            _launchUrl(bookingLink);
                           }
                         },
                       );
@@ -1785,17 +1443,13 @@ class _HomePageState
                   ),
                 ],
               )
-            : const Center(
+            : Center(
                 child: Padding(
-                  padding:
-                      EdgeInsets.all(
-                        32.0,
-                      ),
+                  padding: const EdgeInsets.all(DBSpacing.xl),
                   child: Text(
                     'Das Direktticket ist die günstigste Option.',
-                    style: TextStyle(
-                      fontSize: 16,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -1804,8 +1458,7 @@ class _HomePageState
   }
 }
 
-class LogConsole
-    extends StatelessWidget {
+class LogConsole extends StatelessWidget {
   final List<String> messages;
 
   const LogConsole({
@@ -1815,54 +1468,40 @@ class LogConsole
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(
-          8.0,
-        ),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Log:',
-              style: TextStyle(
-                fontWeight:
-                    FontWeight.bold,
-              ),
+    return DBCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Log:',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount:
-                    messages.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(
-                          vertical: 2,
-                        ),
-                    child: Text(
-                      messages[index],
-                      style: const TextStyle(
-                        fontFamily:
-                            'monospace',
-                        fontSize: 12,
-                      ),
+          ),
+          const SizedBox(height: DBSpacing.sm),
+          Expanded(
+            child: ListView.builder(
+              itemCount: messages.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    messages[index],
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class PriceComparison
-    extends StatelessWidget {
+class PriceComparison extends StatelessWidget {
   final double directPrice;
   final double splitPrice;
   final double savings;
@@ -1876,71 +1515,58 @@ class PriceComparison
 
   @override
   Widget build(BuildContext context) {
-    final bool hasBetterOption =
-        savings > 0;
+    final bool hasBetterOption = savings > 0;
 
     return Column(
       children: [
         Row(
-          mainAxisAlignment:
-              MainAxisAlignment
-                  .spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Direktpreis:'),
+            Text(
+              'Direktpreis:',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             Text(
               '${directPrice.toStringAsFixed(2)} €',
-              style: const TextStyle(
-                fontWeight:
-                    FontWeight.bold,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: DBSpacing.sm),
         Row(
-          mainAxisAlignment:
-              MainAxisAlignment
-                  .spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Split-Ticket-Preis:',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              splitPrice ==
-                      double.infinity
-                  ? 'N/A'
-                  : '${splitPrice.toStringAsFixed(2)} €',
-              style: TextStyle(
-                fontWeight:
-                    FontWeight.bold,
-                color: hasBetterOption
-                    ? Colors.green
-                    : Colors.grey,
+              splitPrice == double.infinity ? 'N/A' : '${splitPrice.toStringAsFixed(2)} €',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: hasBetterOption ? DBColors.dbSuccess : DBColors.dbGray500,
               ),
             ),
           ],
         ),
         if (hasBetterOption) ...[
-          const Divider(height: 16),
+          const Divider(height: DBSpacing.md),
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment
-                    .spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Deine Ersparnis:',
-                style: TextStyle(
-                  fontWeight:
-                      FontWeight.bold,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 '${savings.toStringAsFixed(2)} €',
-                style: const TextStyle(
-                  fontWeight:
-                      FontWeight.bold,
-                  color: Colors.green,
-                  fontSize: 16,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: DBColors.dbSuccess,
                 ),
               ),
             ],
@@ -1951,8 +1577,7 @@ class PriceComparison
   }
 }
 
-class TicketCard
-    extends StatelessWidget {
+class TicketCard extends StatelessWidget {
   final SplitTicket ticket;
   final int index;
   final VoidCallback? onBookPressed;
@@ -1966,125 +1591,77 @@ class TicketCard
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin:
-          const EdgeInsets.symmetric(
-            vertical: 8,
-          ),
-      child: Padding(
-        padding: const EdgeInsets.all(
-          12.0,
-        ),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor:
-                      Theme.of(context)
-                          .colorScheme
-                          .primary,
-                  foregroundColor:
-                      Theme.of(context)
-                          .colorScheme
-                          .onPrimary,
-                  child: Text('$index'),
-                ),
-                const SizedBox(
-                  width: 8,
-                ),
-                Text(
-                  'Ticket $index',
-                  style:
-                      const TextStyle(
-                        fontWeight:
-                            FontWeight
-                                .bold,
-                      ),
-                ),
-                const Spacer(),
-                Text(
-                  '${ticket.price.toStringAsFixed(2)} €',
-                  style:
-                      const TextStyle(
-                        fontWeight:
-                            FontWeight
-                                .bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  Icons.train,
-                  size: 16,
-                ),
-                const SizedBox(
-                  width: 8,
-                ),
-                Expanded(
-                  child: Text(
-                    '${ticket.from} → ${ticket.to}',
-                    style:
-                        const TextStyle(
-                          fontSize: 16,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            if (ticket
-                .coveredByDeutschlandTicket) ...[
-              const SizedBox(height: 8),
-              const Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: Colors.green,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Mit Deutschland-Ticket abgedeckt',
-                    style: TextStyle(
-                      color:
-                          Colors.green,
-                    ),
-                  ),
-                ],
+    return DBCard(
+      padding: const EdgeInsets.all(DBSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                child: Text('$index'),
               ),
-            ] else ...[
-              const SizedBox(
-                height: 12,
+              const SizedBox(width: DBSpacing.sm),
+              Text(
+                'Ticket $index',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              ElevatedButton.icon(
-                onPressed:
-                    onBookPressed,
-                icon: const Icon(
-                  Icons.shopping_cart,
-                ),
-                label: const Text(
-                  'Ticket buchen',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context)
-                          .colorScheme
-                          .primary,
-                  foregroundColor:
-                      Theme.of(context)
-                          .colorScheme
-                          .onPrimary,
+              const Spacer(),
+              Text(
+                '${ticket.price.toStringAsFixed(2)} €',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: DBSpacing.sm),
+          Row(
+            children: [
+              const Icon(Icons.train, size: 16),
+              const SizedBox(width: DBSpacing.sm),
+              Expanded(
+                child: Text(
+                  '${ticket.from} → ${ticket.to}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+          if (ticket.coveredByDeutschlandTicket) ...[
+            const SizedBox(height: DBSpacing.sm),
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: DBColors.dbSuccess,
+                ),
+                const SizedBox(width: DBSpacing.sm),
+                Text(
+                  'Mit Deutschland-Ticket abgedeckt',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: DBColors.dbSuccess,
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: DBSpacing.md),
+            DBButton(
+              text: 'Ticket buchen',
+              icon: Icons.shopping_cart,
+              onPressed: onBookPressed,
+              type: DBButtonType.primary,
+              size: DBButtonSize.medium,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
