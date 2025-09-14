@@ -1,0 +1,34 @@
+name: "CodeQL Configuration"
+
+# Disable automatic language detection and specify only the languages we want
+disable-default-path-filters: false
+
+# Only analyze Python and Dart
+# Note: Dart files are analyzed with the javascript analyzer in CodeQL
+languages:
+  - python
+  - javascript
+
+# Exclude Flutter platform-specific directories and auto-generated files
+paths-ignore:
+  - "flutter-app/android/**"
+  - "flutter-app/ios/**" 
+  - "flutter-app/macos/**"
+  - "flutter-app/windows/**"
+  - "flutter-app/linux/**"
+  - "flutter-app/web/**"
+  # Exclude generated Dart files
+  - "**/*.g.dart"
+  - "**/*.freezed.dart"
+  - "**/*.mocks.dart"
+  - "**/generated_plugin_registrant.dart"
+
+# Explicitly include only the application source code
+paths:
+  - "*.py"
+  - "testing/**"
+  - "flutter-app/lib/**"
+
+# Use security and quality queries
+queries:
+  - uses: security-and-quality
