@@ -1,4 +1,6 @@
 name: Flutter Android 12-Factor CI
+permissions:
+  contents: read
 
 on:
   push:
