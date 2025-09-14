@@ -114,17 +114,27 @@ Es ist wichtig, sich der Datenschutzaspekte beim Nutzen digitaler Angebote der D
 
 ## 📚 Dokumentation
 
-Eine umfassende Dokumentation ist verfügbar:
+Eine umfassende Dokumentation ist verfügbar in **Deutsch** und **Englisch**:
 
-- **[Benutzerhandbuch](docs/USER_GUIDE.md)** - Vollständige Anleitung zur Nutzung von Better-Bahn
-- **[Technische Dokumentation](docs/TECHNICAL_DOCUMENTATION.md)** - Architektur und Implementierungsdetails
-- **[API Dokumentation](docs/API_DOCUMENTATION.md)** - Deutsche Bahn API Endpunkte und Verwendung
-- **[Code-Qualitätsanalyse](docs/CODE_QUALITY_ANALYSIS.md)** - Detaillierte Analyse der Codequalität
-- **[Vor- und Nachteile](docs/PROS_CONS_ANALYSIS.md)** - Umfassende Bewertung des Projekts
-- **[Entwicklerhandbuch](docs/CONTRIBUTING.md)** - Anleitung für Beiträge und Entwicklung
-- **[Projektübersicht](docs/PROJECT_OVERVIEW.md)** - Vollständige Projektanalyse
+### 🇩🇪 Deutsche Dokumentation
+- **[Benutzerhandbuch](docs-de/USER_GUIDE.md)** - Vollständige Anleitung zur Nutzung von Better-Bahn
+- **[Technische Dokumentation](docs-de/TECHNICAL_DOCUMENTATION.md)** - Architektur und Implementierungsdetails
+- **[API Dokumentation](docs-de/API_DOCUMENTATION.md)** - Deutsche Bahn API Endpunkte und Verwendung
+- **[Code-Qualitätsanalyse](docs-de/CODE_QUALITY_ANALYSIS.md)** - Detaillierte Analyse der Codequalität
+- **[Vor- und Nachteile](docs-de/PROS_CONS_ANALYSIS.md)** - Umfassende Bewertung des Projekts
+- **[Entwicklerhandbuch](docs-de/CONTRIBUTING.md)** - Anleitung für Beiträge und Entwicklung
+- **[Projektübersicht](docs-de/PROJECT_OVERVIEW.md)** - Vollständige Projektanalyse
 
-**[📖 Vollständige Dokumentation ansehen](docs/README.md)**
+### 🇬🇧 English Documentation
+- **[User Guide](docs/USER_GUIDE.md)** - Complete guide for using Better-Bahn
+- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)** - Architecture and implementation details
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - Deutsche Bahn API endpoints and usage
+- **[Code Quality Analysis](docs/CODE_QUALITY_ANALYSIS.md)** - Detailed code quality analysis
+- **[Pros & Cons](docs/PROS_CONS_ANALYSIS.md)** - Comprehensive project evaluation
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Guide for contributions and development
+- **[Project Overview](docs/PROJECT_OVERVIEW.md)** - Complete project analysis
+
+**[📖 Deutsche Dokumentation ansehen](docs-de/README.md)** | **[📖 English Documentation](docs/README.md)**
 
 ## To-Do-Liste
 
