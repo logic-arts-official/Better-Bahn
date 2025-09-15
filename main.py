@@ -1,7 +1,9 @@
 import argparse
 import json
 import requests
+import json
 import time
+import argparse
 from urllib.parse import parse_qs, urlparse, quote
 
 
@@ -140,7 +142,7 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
                     break
 
         if is_covered_by_d_ticket:
-            print(f" -> Deutschland-Ticket gültig! Preis wird auf 0.00 € gesetzt.")
+            print(" -> Deutschland-Ticket gültig! Preis wird auf 0.00 € gesetzt.")
             price = 0.0
         elif price is not None:
             print(f" -> Preis gefunden: {price:.2f} €")
@@ -232,7 +234,7 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
 
     if cheapest_split_price < direct_price and cheapest_split_price != float("inf"):
         savings = direct_price - cheapest_split_price
-        print(f"\n🎉 Günstigere Split-Ticket-Option gefunden! 🎉")
+        print("\n🎉 Günstigere Split-Ticket-Option gefunden! 🎉")
         print(f"Direktpreis: {direct_price:.2f} €")
         print(f"Bester Split-Preis: {cheapest_split_price:.2f} €")
         print(f"💰 Ersparnis: {savings:.2f} € 💰")
