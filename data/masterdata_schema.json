@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://better-bahn.logic-arts.de/schemas/masterdata.json",
+  "title": "Better-Bahn Masterdata Schema",
+  "description": "Schema definitions for Deutsche Bahn stations and services/trips",
+  "type": "object",
+  "properties": {
+    "stations": {
+      "type": "array",
+      "description": "Collection of railway stations",
+      "items": {
+        "$ref": "#/$defs/station"
+      }
+    },
+    "services": {
+      "type": "array", 
+      "description": "Collection of train services/trips",
+      "items": {
+        "$ref": "#/$defs/service"
+      }
+    },
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    }
+  },
+  "required": ["stations", "services", "version"],
+  "$defs": {
+    "station": {
+      "type": "object",
+      "description": "Railway station data",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique station identifier (EVA number or internal ID)",
+          "pattern": "^[0-9A-Za-z_-]+$"
+        },
+        "eva": {
+          "type": "integer",
+          "description": "EVA station number (7-digit format)",
+          "minimum": 1000000,
+          "maximum": 9999999
+        },
+        "name": {
+          "type": "string",
+          "description": "Station name",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "name_normalized": {
+          "type": "string",
+          "description": "Normalized station name for search (casefold + diacritics removal)",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lon": {
+          "type": "number", 
+          "description": "Longitude coordinate",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "ds100": {
+          "type": "string",
+          "description": "DS100 station code",
+          "pattern": "^[A-Z0-9 ]+$"
+        },
+        "platforms": {
+          "type": "array",
+          "description": "Available platforms",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9A-Za-z/-]+$"
+          }
+        },
+        "external_ids": {
+          "type": "object",
+          "description": "External system identifiers",
+          "properties": {
+            "hafas": {
+              "type": "string",
+              "description": "HAFAS station ID"
+            },
+            "ibnr": {
+              "type": "integer",
+              "description": "IBNR number"
+            },
+            "db_id": {
+              "type": "string", 
+              "description": "Deutsche Bahn internal ID"
+            }
+          },
+          "additionalProperties": true
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional station metadata",
+          "properties": {
+            "state": {
+              "type": "string",
+              "description": "German state (Bundesland)"
+            },
+            "region": {
+              "type": "string", 
+              "description": "Regional area"
+            },
+            "category": {
+              "type": "string",
+              "enum": ["1", "2", "3", "4", "5", "6", "7"],
+              "description": "DB station category (1=major hub, 7=small station)"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["id", "name", "name_normalized"],
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "description": "Train service/trip data",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique service identifier",
+          "pattern": "^[0-9A-Za-z_-]+$"
+        },
+        "trip_id": {
+          "type": "string",
+          "description": "Trip identifier for this specific service instance"
+        },
+        "line": {
+          "type": "string",
+          "description": "Line/route identifier"
+        },
+        "operator": {
+          "type": "string",
+          "description": "Operating company",
+          "examples": ["DB Fernverkehr AG", "DB Regio AG"]
+        },
+        "product": {
+          "type": "string",
+          "description": "Product type",
+          "enum": ["ICE", "IC", "EC", "RE", "RB", "S", "U", "TRAM", "BUS"]
+        },
+        "stops": {
+          "type": "array",
+          "description": "Sequence of stops for this service",
+          "items": {
+            "$ref": "#/$defs/service_stop"
+          },
+          "minItems": 2
+        },
+        "operating_days": {
+          "type": "object",
+          "description": "Days when service operates",
+          "properties": {
+            "monday": {"type": "boolean"},
+            "tuesday": {"type": "boolean"}, 
+            "wednesday": {"type": "boolean"},
+            "thursday": {"type": "boolean"},
+            "friday": {"type": "boolean"},
+            "saturday": {"type": "boolean"},
+            "sunday": {"type": "boolean"},
+            "date_range": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Service start date (YYYY-MM-DD)"
+                },
+                "end": {
+                  "type": "string", 
+                  "format": "date",
+                  "description": "Service end date (YYYY-MM-DD)"
+                }
+              },
+              "required": ["start", "end"]
+            }
+          },
+          "required": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        },
+        "attributes": {
+          "type": "array",
+          "description": "Service attributes and features",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Attribute key",
+                "examples": ["9G", "WLAN", "RESTAURANT"]
+              },
+              "value": {
+                "type": "string",
+                "description": "Attribute value"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable attribute description"
+              }
+            },
+            "required": ["key"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "product", "stops", "operating_days"],
+      "additionalProperties": false
+    },
+    "service_stop": {
+      "type": "object", 
+      "description": "A stop within a service/trip",
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "description": "Reference to station ID"
+        },
+        "sequence": {
+          "type": "integer",
+          "description": "Stop sequence number (0-based)",
+          "minimum": 0
+        },
+        "arrival_planned": {
+          "type": "string",
+          "description": "Planned arrival time (ISO 8601 format)",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z?$"
+        },
+        "departure_planned": {
+          "type": "string", 
+          "description": "Planned departure time (ISO 8601 format)",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z?$"
+        },
+        "platform": {
+          "type": "string",
+          "description": "Planned platform/track"
+        },
+        "stop_type": {
+          "type": "string",
+          "enum": ["boarding_only", "alighting_only", "boarding_alighting", "pass_through"],
+          "description": "Type of stop operation"
+        },
+        "attributes": {
+          "type": "array",
+          "description": "Stop-specific attributes",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {"type": "string"},
+              "value": {"type": "string"},
+              "description": {"type": "string"}
+            },
+            "required": ["key"]
+          }
+        }
+      },
+      "required": ["station_id", "sequence"],
+      "additionalProperties": false
+    }
+  }
+}

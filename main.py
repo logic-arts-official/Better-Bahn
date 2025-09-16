@@ -4,9 +4,23 @@ from urllib.parse import parse_qs, urlparse, quote
 import time
 import yaml
 import os
+import json
+import hashlib
+import re
+import unicodedata
+from datetime import datetime
 from db_transport_api import DBTransportAPIClient
 
+try:
+    import jsonschema
+
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
+    print("⚠️ Warnung: jsonschema nicht verfügbar. Schema-Validierung ist deaktiviert.")
+
 # --- HILFSFUNKTIONEN ---
+
 
 def load_timetable_masterdata():
     """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
@@ -55,6 +69,342 @@ def validate_eva_number(eva_no):
         return False
 
 
+# --- ERWEITERTE MASTERDATA-FUNKTIONEN ---
+
+
+def load_masterdata_schema():
+    """Lädt das JSON-Schema für Masterdata-Validierung."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    schema_path = os.path.join(current_dir, "data", "masterdata_schema.json")
+
+    try:
+        with open(schema_path, "r", encoding="utf-8") as file:
+            schema = json.load(file)
+            print(f"✓ Masterdata-Schema geladen: {schema.get('title', 'Unbekannt')}")
+            return schema
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Masterdata-Schema nicht gefunden unter {schema_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Fehler beim Laden des Masterdata-Schemas: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden des Schemas: {e}")
+        return None
+
+
+def load_timetables_version():
+    """Lädt die Versionsinformationen der Timetables."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    version_path = os.path.join(current_dir, "data", "timetables.version.json")
+
+    try:
+        with open(version_path, "r", encoding="utf-8") as file:
+            version_info = json.load(file)
+            print(
+                f"✓ Timetables-Version geladen: {version_info.get('version', 'Unbekannt')}"
+            )
+            return version_info
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Versionsinformationen nicht gefunden unter {version_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Fehler beim Laden der Versionsinformationen: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden der Versionsinformationen: {e}")
+        return None
+
+
+def normalize_station_name(name):
+    """
+    Normalisiert Stationsnamen für Suchindex:
+    - casefold (Unicode-bewusste Kleinschreibung)
+    - Diakritika-Entfernung (ä → a, ö → o, etc.)
+    - Leerzeichen normalisieren
+    """
+    if not name:
+        return ""
+
+    # Unicode-Normalisierung (NFD = Composed → Decomposed)
+    normalized = unicodedata.normalize("NFD", name)
+
+    # Diakritika entfernen (combining characters)
+    no_diacritics = "".join(
+        char for char in normalized if unicodedata.category(char) != "Mn"
+    )
+
+    # casefold für Unicode-bewusste Kleinschreibung
+    casefolded = no_diacritics.casefold()
+
+    # Leerzeichen normalisieren und trimmen
+    clean = re.sub(r"\s+", " ", casefolded).strip()
+
+    return clean
+
+
+def validate_station_data(station_data):
+    """
+    Validiert Stationsdaten gegen das Masterdata-Schema.
+
+    Args:
+        station_data: Dictionary mit Stationsdaten
+
+    Returns:
+        Tuple (is_valid: bool, errors: list)
+    """
+    if not JSONSCHEMA_AVAILABLE:
+        print("⚠️ jsonschema nicht verfügbar - nur Basis-Validierung")
+        # Basis-Validierung ohne jsonschema
+        errors = []
+        if not station_data.get("id"):
+            errors.append("Station ID ist erforderlich")
+        if not station_data.get("name"):
+            errors.append("Station Name ist erforderlich")
+        return len(errors) == 0, errors
+
+    schema = load_masterdata_schema()
+    if not schema:
+        return False, ["Schema konnte nicht geladen werden"]
+
+    try:
+        # Einzelne Station gegen Station-Schema validieren
+        station_schema = schema.get("$defs", {}).get("station", {})
+        if not station_schema:
+            return False, ["Station-Schema nicht im Masterdata-Schema gefunden"]
+
+        jsonschema.validate(station_data, station_schema)
+
+        # Zusätzliche logische Validierung
+        errors = []
+
+        # EVA-Nummer validieren falls vorhanden
+        if "eva" in station_data and not validate_eva_number(station_data["eva"]):
+            errors.append(f"Ungültige EVA-Nummer: {station_data['eva']}")
+
+        # Koordinaten-Plausibilität prüfen
+        lat = station_data.get("lat")
+        lon = station_data.get("lon")
+        if lat is not None and lon is not None:
+            # Deutschland liegt etwa zwischen 47-55°N, 6-15°E
+            if not (47 <= lat <= 55):
+                errors.append(f"Latitude außerhalb Deutschland-Bereich: {lat}")
+            if not (6 <= lon <= 15):
+                errors.append(f"Longitude außerhalb Deutschland-Bereich: {lon}")
+
+        return len(errors) == 0, errors
+
+    except jsonschema.ValidationError as e:
+        return False, [f"Schema-Validierungsfehler: {e.message}"]
+    except Exception as e:
+        return False, [f"Unerwarteter Validierungsfehler: {str(e)}"]
+
+
+def validate_service_data(service_data):
+    """
+    Validiert Service/Trip-Daten gegen das Masterdata-Schema.
+
+    Args:
+        service_data: Dictionary mit Service-Daten
+
+    Returns:
+        Tuple (is_valid: bool, errors: list)
+    """
+    if not JSONSCHEMA_AVAILABLE:
+        print("⚠️ jsonschema nicht verfügbar - nur Basis-Validierung")
+        # Basis-Validierung ohne jsonschema
+        errors = []
+        if not service_data.get("id"):
+            errors.append("Service ID ist erforderlich")
+        if not service_data.get("product"):
+            errors.append("Service Product ist erforderlich")
+        if not service_data.get("stops") or len(service_data["stops"]) < 2:
+            errors.append("Service muss mindestens 2 Stops haben")
+        return len(errors) == 0, errors
+
+    schema = load_masterdata_schema()
+    if not schema:
+        return False, ["Schema konnte nicht geladen werden"]
+
+    try:
+        # Service gegen Service-Schema validieren
+        service_schema = schema.get("$defs", {}).get("service", {})
+        if not service_schema:
+            return False, ["Service-Schema nicht im Masterdata-Schema gefunden"]
+
+        # Create a resolver for the full schema context
+        resolver = jsonschema.RefResolver(
+            base_uri=schema.get("$id", ""), referrer=schema
+        )
+        validator = jsonschema.Draft202012Validator(service_schema, resolver=resolver)
+
+        # Collect validation errors
+        validation_errors = []
+        for error in validator.iter_errors(service_data):
+            validation_errors.append(f"Schema-Validierungsfehler: {error.message}")
+
+        if validation_errors:
+            return False, validation_errors
+
+        # Zusätzliche logische Validierung
+        errors = []
+
+        # Stop-Sequenz validieren
+        stops = service_data.get("stops", [])
+        for i, stop in enumerate(stops):
+            if stop.get("sequence") != i:
+                errors.append(
+                    f"Stop-Sequenz stimmt nicht überein: erwartet {i}, gefunden {stop.get('sequence')}"
+                )
+
+        # Zeitlogik validieren (Departure nach Arrival)
+        for stop in stops:
+            arrival = stop.get("arrival_planned")
+            departure = stop.get("departure_planned")
+            if arrival and departure:
+                try:
+                    arrival_time = datetime.fromisoformat(
+                        arrival.replace("Z", "+00:00")
+                    )
+                    departure_time = datetime.fromisoformat(
+                        departure.replace("Z", "+00:00")
+                    )
+                    if departure_time < arrival_time:
+                        errors.append(
+                            f"Abfahrt vor Ankunft in Stop {stop.get('sequence', '?')}"
+                        )
+                except ValueError:
+                    errors.append(
+                        f"Ungültiges Zeitformat in Stop {stop.get('sequence', '?')}"
+                    )
+
+        return len(errors) == 0, errors
+
+    except Exception as e:
+        return False, [f"Unerwarteter Validierungsfehler: {str(e)}"]
+
+
+def compute_file_hash(file_path):
+    """Berechnet SHA256-Hash einer Datei."""
+    try:
+        hash_sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_sha256.update(chunk)
+        return hash_sha256.hexdigest()
+    except Exception as e:
+        print(f"Fehler beim Hash-Berechnen für {file_path}: {e}")
+        return None
+
+
+def update_timetables_version(stats=None):
+    """
+    Aktualisiert die timetables.version.json mit neuen Informationen.
+
+    Args:
+        stats: Dictionary mit Statistiken (optional)
+    """
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    version_path = os.path.join(current_dir, "data", "timetables.version.json")
+    timetables_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+    # Hash der Timetables-Datei berechnen
+    file_hash = compute_file_hash(timetables_path)
+
+    # Aktuelle Zeit
+    now = datetime.utcnow().isoformat() + "Z"
+
+    # Versionsinformationen laden oder erstellen
+    version_info = load_timetables_version() or {}
+
+    # Aktualisieren
+    version_info.update(
+        {
+            "file_sha256": file_hash or "hash_computation_failed",
+            "generated_at": now,
+            "statistics": stats
+            or version_info.get(
+                "statistics",
+                {"total_stations": 0, "total_services": 0, "last_updated": now},
+            ),
+        }
+    )
+
+    try:
+        with open(version_path, "w", encoding="utf-8") as f:
+            json.dump(version_info, f, indent=2, ensure_ascii=False)
+        print(f"✓ Versionsinformationen aktualisiert: {version_path}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Fehler beim Aktualisieren der Versionsinformationen: {e}")
+        return False
+
+
+def precompute_adjacency_data(stations, services):
+    """
+    Vorberechnung von Adjazenz-/Routensegmenten für Journey Planning.
+
+    Args:
+        stations: Liste von Station-Daten
+        services: Liste von Service-Daten
+
+    Returns:
+        Dictionary mit vorberechneten Routing-Daten
+    """
+    adjacency = {}
+    route_segments = []
+
+    print("Berechne Adjazenz-Daten...")
+
+    # Für jeden Service die direkt verbundenen Stationen extrahieren
+    for service in services:
+        stops = service.get("stops", [])
+        service_id = service.get("id", "unknown")
+
+        # Alle aufeinanderfolgenden Stop-Paare sind direkt verbunden
+        for i in range(len(stops) - 1):
+            from_stop = stops[i]
+            to_stop = stops[i + 1]
+
+            from_station = from_stop.get("station_id")
+            to_station = to_stop.get("station_id")
+
+            if from_station and to_station:
+                # Adjazenz-Liste aufbauen
+                if from_station not in adjacency:
+                    adjacency[from_station] = set()
+                adjacency[from_station].add(to_station)
+
+                # Route-Segment hinzufügen
+                segment = {
+                    "from_station": from_station,
+                    "to_station": to_station,
+                    "service_id": service_id,
+                    "from_sequence": from_stop.get("sequence"),
+                    "to_sequence": to_stop.get("sequence"),
+                    "departure_planned": from_stop.get("departure_planned"),
+                    "arrival_planned": to_stop.get("arrival_planned"),
+                }
+                route_segments.append(segment)
+
+    # Sets zu Listen konvertieren für JSON-Serialisierung
+    adjacency_lists = {k: list(v) for k, v in adjacency.items()}
+
+    routing_data = {
+        "adjacency": adjacency_lists,
+        "route_segments": route_segments,
+        "computed_at": datetime.utcnow().isoformat() + "Z",
+        "total_stations": len(adjacency_lists),
+        "total_segments": len(route_segments),
+    }
+
+    print(
+        f"✓ Adjazenz-Daten berechnet: {len(adjacency_lists)} Stationen, {len(route_segments)} Segmente"
+    )
+
+    return routing_data
+
+
 def create_traveller_payload(age, bahncard_option):
     """Erstellt das 'reisende' JSON-Objekt basierend auf der ausgewählten BahnCard."""
     ermaessigung = {"art": "KEINE_ERMAESSIGUNG", "klasse": "KLASSENLOS"}
@@ -76,62 +426,60 @@ def create_traveller_payload(age, bahncard_option):
 def get_real_time_journey_info(from_station_name, to_station_name, departure_time=None):
     """
     Holt Echtzeit-Reiseinformationen über die v6.db.transport.rest API.
-    
+
     Args:
         from_station_name: Name der Abfahrtstation
-        to_station_name: Name der Zielstation  
+        to_station_name: Name der Zielstation
         departure_time: Abfahrtszeit (optional)
-        
+
     Returns:
         Dictionary mit Echtzeit-Informationen oder None bei Fehler
     """
     try:
         print(f"Hole Echtzeit-Daten für {from_station_name} → {to_station_name}...")
-        
+
         client = DBTransportAPIClient(rate_limit_delay=0.2)
-        
+
         # Stationen finden
         from_locations = client.find_locations(from_station_name, results=1)
         to_locations = client.find_locations(to_station_name, results=1)
-        
+
         if not from_locations or not to_locations:
             print("Warnung: Konnte Stationen nicht über Echtzeit-API finden")
             return None
-            
-        from_id = from_locations[0]['id']
-        to_id = to_locations[0]['id']
-        
+
+        from_id = from_locations[0]["id"]
+        to_id = to_locations[0]["id"]
+
         # Verbindungen suchen
         journeys_data = client.get_journeys(
-            from_id, 
-            to_id, 
-            departure=departure_time,
-            results=3,
-            stopovers=True
+            from_id, to_id, departure=departure_time, results=3, stopovers=True
         )
-        
-        if not journeys_data or 'journeys' not in journeys_data:
+
+        if not journeys_data or "journeys" not in journeys_data:
             print("Warnung: Keine Echtzeit-Verbindungen gefunden")
             return None
-            
+
         real_time_info = {
-            'available': True,
-            'journeys_count': len(journeys_data['journeys']),
-            'journeys': []
+            "available": True,
+            "journeys_count": len(journeys_data["journeys"]),
+            "journeys": [],
         }
-        
-        for journey in journeys_data['journeys'][:2]:  # Nur erste 2 Verbindungen
+
+        for journey in journeys_data["journeys"][:2]:  # Nur erste 2 Verbindungen
             status = client.get_real_time_status(journey)
             journey_info = {
-                'duration_minutes': journey.get('duration', 0) // 60 if journey.get('duration') else 0,
-                'transfers': len(journey.get('legs', [])) - 1,
-                'real_time_status': status,
-                'legs_count': len(journey.get('legs', []))
+                "duration_minutes": journey.get("duration", 0) // 60
+                if journey.get("duration")
+                else 0,
+                "transfers": len(journey.get("legs", [])) - 1,
+                "real_time_status": status,
+                "legs_count": len(journey.get("legs", [])),
             }
-            real_time_info['journeys'].append(journey_info)
-        
+            real_time_info["journeys"].append(journey_info)
+
         return real_time_info
-        
+
     except Exception as e:
         print(f"Fehler beim Abrufen der Echtzeit-Daten: {e}")
         return None
@@ -140,28 +488,28 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
 def enhance_connection_with_real_time(connection_data, real_time_info):
     """
     Erweitert Verbindungsdaten um Echtzeit-Informationen.
-    
+
     Args:
         connection_data: Bestehende Verbindungsdaten von bahn.de
         real_time_info: Echtzeit-Daten von v6.db.transport.rest
-        
+
     Returns:
         Erweiterte Verbindungsdaten
     """
-    if not real_time_info or not real_time_info.get('available'):
+    if not real_time_info or not real_time_info.get("available"):
         return connection_data
-    
+
     # Echtzeit-Status zu den Verbindungen hinzufügen
-    if 'verbindungen' in connection_data and connection_data['verbindungen']:
-        first_connection = connection_data['verbindungen'][0]
-        
-        if real_time_info['journeys']:
-            first_journey = real_time_info['journeys'][0]
-            first_connection['echtzeit_status'] = first_journey['real_time_status']
-            first_connection['echtzeit_verfügbar'] = True
+    if "verbindungen" in connection_data and connection_data["verbindungen"]:
+        first_connection = connection_data["verbindungen"][0]
+
+        if real_time_info["journeys"]:
+            first_journey = real_time_info["journeys"][0]
+            first_connection["echtzeit_status"] = first_journey["real_time_status"]
+            first_connection["echtzeit_verfügbar"] = True
         else:
-            first_connection['echtzeit_verfügbar'] = False
-    
+            first_connection["echtzeit_verfügbar"] = False
+
     return connection_data
 
 
@@ -495,33 +843,50 @@ if __name__ == "__main__":
     # --- ECHTZEIT-DATEN INTEGRATION ---
     if args.real_time:
         print("\n--- Integriere Echtzeit-Daten ---")
-        
+
         # Extrahiere Stationsnamen für Echtzeit-Abfrage
         first_connection = connection_data["verbindungen"][0]
-        
-        if "verbindungsAbschnitte" in first_connection and first_connection["verbindungsAbschnitte"]:
-            start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0]["bahnhofsName"]
-            end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1]["bahnhofsName"]
-            
+
+        if (
+            "verbindungsAbschnitte" in first_connection
+            and first_connection["verbindungsAbschnitte"]
+        ):
+            start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0][
+                "bahnhofsName"
+            ]
+            end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1][
+                "bahnhofsName"
+            ]
+
             # Hole Echtzeit-Informationen
-            real_time_info = get_real_time_journey_info(start_station, end_station, date_part)
-            
+            real_time_info = get_real_time_journey_info(
+                start_station, end_station, date_part
+            )
+
             # Erweitere Verbindungsdaten um Echtzeit-Informationen
-            connection_data = enhance_connection_with_real_time(connection_data, real_time_info)
-            
+            connection_data = enhance_connection_with_real_time(
+                connection_data, real_time_info
+            )
+
             # Zeige Echtzeit-Status an
-            if real_time_info and real_time_info.get('available'):
-                print(f"✓ Echtzeit-Daten erfolgreich integriert ({real_time_info['journeys_count']} Verbindungen)")
-                
-                if real_time_info['journeys']:
-                    first_journey = real_time_info['journeys'][0]
-                    rt_status = first_journey['real_time_status']
-                    
-                    if rt_status['has_delays']:
-                        print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
-                    if rt_status['cancelled_legs'] > 0:
-                        print(f"❌ Ausfälle: {rt_status['cancelled_legs']} Teilstrecken betroffen")
-                    if not rt_status['has_delays'] and rt_status['cancelled_legs'] == 0:
+            if real_time_info and real_time_info.get("available"):
+                print(
+                    f"✓ Echtzeit-Daten erfolgreich integriert ({real_time_info['journeys_count']} Verbindungen)"
+                )
+
+                if real_time_info["journeys"]:
+                    first_journey = real_time_info["journeys"][0]
+                    rt_status = first_journey["real_time_status"]
+
+                    if rt_status["has_delays"]:
+                        print(
+                            f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten"
+                        )
+                    if rt_status["cancelled_legs"] > 0:
+                        print(
+                            f"❌ Ausfälle: {rt_status['cancelled_legs']} Teilstrecken betroffen"
+                        )
+                    if not rt_status["has_delays"] and rt_status["cancelled_legs"] == 0:
                         print("✅ Aktuell keine Verspätungen oder Ausfälle")
             else:
                 print("⚠️  Echtzeit-Daten momentan nicht verfügbar")
