@@ -534,7 +534,6 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
         journeys_data = journeys_result.data
         if not journeys_data or 'journeys' not in journeys_data:
             print("Warnung: Keine Echtzeit-Verbindungen in Antwort gefunden")
-
             return None
 
         real_time_info = {
