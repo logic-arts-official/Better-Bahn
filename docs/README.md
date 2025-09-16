@@ -22,6 +22,7 @@ Welcome to the comprehensive documentation for Better-Bahn! This collection prov
 ### For Developers
 - **[Contributing Guide](CONTRIBUTING.md)** - Everything needed to contribute
   - Development environment setup
+  - Branch management (including dev branch for masterdata/API changes)
   - Coding standards and best practices
   - Testing guidelines
   - Code review process
