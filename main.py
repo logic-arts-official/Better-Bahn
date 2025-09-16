@@ -12,11 +12,13 @@ def load_timetable_masterdata():
     """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
-    
+
     try:
-        with open(yaml_path, 'r', encoding='utf-8') as file:
+        with open(yaml_path, "r", encoding="utf-8") as file:
             masterdata = yaml.safe_load(file)
-            print(f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})")
+            print(
+                f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+            )
             return masterdata
     except FileNotFoundError:
         print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
@@ -32,8 +34,12 @@ def load_timetable_masterdata():
 def get_station_schema():
     """Gibt das Schema für Stationsdaten aus den Masterdaten zurück."""
     masterdata = load_timetable_masterdata()
-    if masterdata and 'components' in masterdata and 'schemas' in masterdata['components']:
-        return masterdata['components']['schemas']
+    if (
+        masterdata
+        and "components" in masterdata
+        and "schemas" in masterdata["components"]
+    ):
+        return masterdata["components"]["schemas"]
     return None
 
 
@@ -330,11 +336,11 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
+
     # Lade statische Fahrplan-Masterdaten
     print("--- Initialisierung ---")
     masterdata = load_timetable_masterdata()
-    
+
     traveller_payload = create_traveller_payload(args.age, args.bahncard)
 
     connection_data, date_part = None, None
