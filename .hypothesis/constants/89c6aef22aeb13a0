@@ -1,4 +1,0 @@
-# file: /home/runner/work/Better-Bahn/Better-Bahn/db_transport_api.py
-# hypothesis_version: 6.138.17
-
-[0.2, 120, 1000, '/journeys', '/locations', '/stops/nearby', '8000261', 'Accept', 'Berlin Hbf', 'User-Agent', '__main__', 'accessibility', 'application/json', 'arrival', 'arrival_delay', 'cancelled', 'cancelled_legs', 'delay', 'delays_by_leg', 'departure', 'departure_delay', 'distance', 'duration', 'from', 'has_delays', 'id', 'journeys', 'latitude', 'leg_id', 'legs', 'lineName', 'longitude', 'query', 'results', 'stopovers', 'to', 'total_delay_minutes', 'transfers', 'unknown', 'when']
