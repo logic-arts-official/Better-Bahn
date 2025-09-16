@@ -212,7 +212,6 @@ class DBBorderRadius {
 class DBTheme {
   static ThemeData get lightTheme => ThemeData(
     useMaterial3: true,
-    textTheme: GoogleFonts.latoTextTheme(),
     
     // Color Scheme
     colorScheme: const ColorScheme.light(
