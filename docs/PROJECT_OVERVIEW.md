@@ -113,6 +113,13 @@ Generate Results & Booking Links
 - **Mathematical Optimality**: Dynamic programming guarantees best solution
 - **Comprehensive Analysis**: Considers all possible ticket combinations
 - **Smart Integration**: Handles BahnCard discounts and Deutschland-Ticket
+- **Data Validation**: Static masterdata ensures schema compliance and accuracy
+
+#### **Masterdata Integration**
+- **Official Schema Compliance**: Uses Deutsche Bahn Timetables API v1.0.213 specification
+- **Station Data Validation**: EVA number format validation (7-digit European station codes)
+- **Schema Documentation**: Self-documenting API structures for development
+- **Future-Ready**: Prepared for enhanced validation and station lookup features
 
 #### **User Experience**
 - **Minimal Friction**: Copy URL, get results, click booking links
