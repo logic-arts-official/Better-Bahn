@@ -1,0 +1,21 @@
+{
+  "version": "1.0.213",
+  "file_sha256": "7de1abba2c90bd8fbd605654d6ac5553ae76f50a950cb3700ccb25d2cf9baec9",
+  "generated_at": "2025-09-16T12:14:30.424052Z",
+  "schema_version": "1.0.0",
+  "source": {
+    "api_version": "1.0.213",
+    "api_base": "https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1",
+    "description": "Deutsche Bahn Timetables API Schema"
+  },
+  "statistics": {
+    "total_stations": 3,
+    "total_services": 1,
+    "last_updated": "2025-09-16T12:14:30.423966Z"
+  },
+  "validation": {
+    "schema_file": "data/masterdata_schema.json",
+    "validation_enabled": true,
+    "validation_errors": 0
+  }
+}

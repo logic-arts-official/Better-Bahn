@@ -33,6 +33,14 @@ Ich selbst besitze weder einen Mac noch ein iOS-Gerät, um die App für iOS zu k
 
 ## Development
 
+### Branch Management
+
+Dieses Projekt nutzt zwei Hauptbranches:
+- **`main`**: Produktionscode und stabile Releases
+- **`dev`**: Entwicklungsbranch für neue Masterdata- und API-Integration
+
+Für neue Features und Experimente, besonders für Masterdata-Updates und API-Änderungen, verwende bitte den `dev`-Branch als Basis.
+
 ### Building the app
 
 1. Stelle sicher, dass Flutter auf deinem System installiert ist
@@ -148,6 +156,15 @@ Eine umfassende Dokumentation ist verfügbar in **Deutsch** und **Englisch**:
 Wenn diese App Ihnen geholfen hat, bei Ihren Bahnreisen Geld zu sparen, wäre es großartig, wenn Sie einen Teil oder die gesamte Ersparnis als Spende in dieses Projekt investieren könnten. Ihre Unterstützung hilft, die Weiterentwicklung und Wartung der App zu sichern!
 
 Sie finden die Spendenmöglichkeiten über den "Sponsor"-Button oben auf dieser GitHub-Seite.
+
+## Documentation
+
+Das Projekt enthält umfassende Dokumentation in `docs/`:
+
+- **[HAFAS_CLIENT_ANALYSIS.md](docs/HAFAS_CLIENT_ANALYSIS.md)** - Detaillierte Analyse des hafas-client Projekts und Vergleich mit Better-Bahn
+- **[IMPLEMENTATION_RECOMMENDATIONS.md](docs/IMPLEMENTATION_RECOMMENDATIONS.md)** - Spezifische Empfehlungen für Verbesserungen basierend auf hafas-client Patterns
+- **[TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Erweiterte technische Dokumentation mit hafas-client inspirierten Verbesserungen
+- **[API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)** - Verbesserte API-Dokumentation mit strukturierter Fehlerbehandlung
 
 ## Beitragen
 

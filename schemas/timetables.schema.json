@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deutsche Bahn Timetables API Schema",
+  "description": "JSON Schema for validating Deutsche Bahn Timetables API YAML masterdata",
+  "type": "object",
+  "required": ["openapi", "info", "components"],
+  "properties": {
+    "openapi": {
+      "type": "string",
+      "pattern": "^3\\.0\\.[0-9]+$",
+      "description": "OpenAPI specification version"
+    },
+    "info": {
+      "type": "object",
+      "required": ["title", "version"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "API title"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "API version in semantic versioning format"
+        },
+        "description": {
+          "type": "string",
+          "description": "API description"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        },
+        "termsOfService": {
+          "type": "string",
+          "format": "uri"
+        },
+        "x-ibm-name": {
+          "type": "string"
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "required": ["schemas"],
+      "properties": {
+        "schemas": {
+          "type": "object",
+          "description": "Schema definitions",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Individual schema definition"
+          }
+        },
+        "securitySchemes": {
+          "type": "object",
+          "description": "Security scheme definitions",
+          "additionalProperties": true
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "description": "API endpoints",
+      "additionalProperties": true
+    },
+    "security": {
+      "type": "array",
+      "description": "Security requirements",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "x-ibm-endpoints": {
+      "type": "array",
+      "description": "IBM API Connect endpoints",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
