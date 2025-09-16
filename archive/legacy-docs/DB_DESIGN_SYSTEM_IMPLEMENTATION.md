@@ -11,7 +11,7 @@ Upgrade the Better-Bahn Flutter application to use the official Deutsche Bahn De
 
 #### 1. Design System Foundation
 - **Complete color token system** implementing DB's official palette
-- **Typography system** with DB Sans and DB Head font families
+- **Typography system** with Google Fonts Lato (replacing proprietary DB fonts)
 - **Spacing scale** following DB guidelines (4px to 64px scale)
 - **Border radius tokens** for consistent corner styling
 - **Elevation system** with proper shadow definitions
@@ -57,7 +57,7 @@ flutter-app/
 
 #### Before vs After
 - **Color Scheme**: Material Design colors → Official DB color palette
-- **Typography**: System fonts → DB Sans and DB Head font families
+- **Typography**: System fonts → Google Fonts Lato with DB-inspired styling
 - **Components**: Generic Material → DB-branded components
 - **Spacing**: Inconsistent → Standardized DB spacing scale
 - **Interactions**: Basic → Enhanced with proper states and feedback

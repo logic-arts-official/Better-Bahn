@@ -34,22 +34,19 @@ The color palette follows DB's official color tokens:
 
 ### Typography (`DBTextStyles`)
 
-The typography system uses two font families:
+The typography system has been updated to use Google Fonts Lato instead of proprietary DB fonts:
 
-#### DB Sans
-- Primary font for body text, labels, and most UI elements
-- Weights: Regular (400), Medium (500), SemiBold (600), Bold (700)
-
-#### DB Head
-- Display font for headlines and prominent text
-- Weights: Regular (400), Bold (700)
+#### Font Family
+- **Google Fonts Lato**: Used for all text styles throughout the app
+- Provides excellent readability and supports multiple weights
+- Automatically handled by the `google_fonts` package
 
 #### Text Styles
-- **Display**: Large headlines (57px, 45px, 36px)
-- **Headline**: Section headings (32px, 28px, 24px)
-- **Title**: Subsection titles (22px, 16px, 14px)
-- **Body**: Main content text (16px, 14px, 12px)
-- **Label**: UI labels and buttons (14px, 12px, 11px)
+- **Display**: Large headlines (57px, 45px, 36px) - Lato Bold
+- **Headline**: Section headings (32px, 28px, 24px) - Lato Bold
+- **Title**: Subsection titles (22px, 16px, 14px) - Lato SemiBold
+- **Body**: Main content text (16px, 14px, 12px) - Lato Regular
+- **Label**: UI labels and buttons (14px, 12px, 11px) - Lato SemiBold
 
 ### Spacing (`DBSpacing`)
 
@@ -116,24 +113,24 @@ Consistent corner radius tokens:
 
 The app uses `DBTheme.lightTheme` and `DBTheme.darkTheme` which provide:
 - Complete Material 3 color scheme mapping
-- Typography theme using DB text styles
+- Typography theme using Google Fonts Lato
 - Component themes for consistent styling
 - Support for light and dark modes
 
-## Font Requirements
+## Font Implementation
 
-To use the DB fonts, you need to:
+The app now uses Google Fonts Lato instead of proprietary DB fonts:
 
-1. Obtain the official DB Sans and DB Head font files from Deutsche Bahn
-2. Place them in `assets/fonts/` directory:
-   - `DBSans-Regular.ttf`
-   - `DBSans-Medium.ttf`
-   - `DBSans-SemiBold.ttf`
-   - `DBSans-Bold.ttf`
-   - `DBHead-Regular.ttf`
-   - `DBHead-Bold.ttf`
+**Benefits:**
+- No licensing requirements or font file management
+- Automatic font loading via `google_fonts` package
+- Consistent cross-platform rendering
+- Fallback to system fonts when offline
 
-**Note**: DB fonts are proprietary and require proper licensing from Deutsche Bahn. For development and testing, the system will fall back to system fonts.
+**Implementation:**
+- All `DBTextStyles` use `GoogleFonts.lato()` with appropriate weights
+- Theme configurations updated to use Google Fonts
+- No local font assets required
 
 ## Usage Examples
 

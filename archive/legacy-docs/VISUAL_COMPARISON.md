@@ -33,11 +33,11 @@ Weights: Standard Material weights
 
 #### After
 ```
-Primary: DB Sans (400, 500, 600, 700)
-Display: DB Head (400, 700) for headlines
-Hierarchy: DB-specific typography scale
-Line Heights: Optimized for DB brand readability
-Letter Spacing: DB-specific spacing for better legibility
+Primary: Google Fonts Lato (400, 600, 700)
+Display: Lato Bold for headlines
+Hierarchy: DB-inspired typography scale
+Line Heights: Optimized for readability
+Letter Spacing: Professional spacing for better legibility
 ```
 
 ### 🔲 Component Upgrades
@@ -103,10 +103,10 @@ Letter Spacing: DB-specific spacing for better legibility
 
 **After:**
 ```
-- DB Head for prominent headlines
-- DB Sans for body text and UI elements
+- Lato Bold for prominent headlines
+- Lato Regular/SemiBold for body text and UI elements
 - Consistent 8px spacing scale
-- Professional DB brand recognition
+- Professional typography with DB color scheme
 ```
 
 #### Accessibility
@@ -158,7 +158,7 @@ Letter Spacing: DB-specific spacing for better legibility
 
 **After:**
 ```
-[DB Red Header with "Better Bahn" in DB Head font]
+[DB Red Header with "Better Bahn" in Lato Bold font]
 [DB-styled input with red focus and clear/paste icons]
 [Professional DB card with "Reisende & Rabatte" section]
 [DB Red primary button "Verbindung analysieren"]
@@ -178,7 +178,7 @@ Letter Spacing: DB-specific spacing for better legibility
 ```
 [DB-styled cards with proper elevation]
 [DB Green check icons for savings found]
-[DB Sans typography with proper hierarchy]
+[Lato typography with proper hierarchy]
 [Professional price comparison with DB colors]
 [DB-styled ticket cards with red "Ticket buchen" buttons]
 ```
@@ -203,7 +203,7 @@ Letter Spacing: DB-specific spacing for better legibility
 
 ### Deutsche Bahn Brand Compliance
 ✅ **Official color palette** - Matches DB brand guidelines  
-✅ **Typography system** - Uses DB Sans and DB Head fonts  
+✅ **Typography system** - Uses Google Fonts Lato with DB design principles  
 ✅ **Visual hierarchy** - Follows DB design principles  
 ✅ **Interaction patterns** - Consistent with DB digital standards  
 ✅ **Accessibility** - Meets DB accessibility requirements  
