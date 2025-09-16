@@ -398,7 +398,6 @@ class DBTheme {
   
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
-    textTheme: GoogleFonts.latoTextTheme(ThemeData.dark().textTheme),
     
     // Dark Color Scheme
     colorScheme: const ColorScheme.dark(
