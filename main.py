@@ -562,7 +562,7 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
                 "real_time_status": status,
                 "legs_count": len(journey.get("legs", [])),
             }
-        real_time_info['journeys'].append(journey_info)
+            real_time_info['journeys'].append(journey_info)
         
         # API-Statistiken für Debugging (nur bei Bedarf anzeigen)
         stats = client.get_stats()
