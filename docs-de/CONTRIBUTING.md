@@ -75,14 +75,31 @@ flutter run
 ## Entwicklungsworkflow
 
 ### Branch-Management
+
+#### Repository-Branches
+- **`main`**: Produktions-Branch für stabile Releases
+- **`dev`**: Entwicklungs-Branch für neue Masterdata- und API-Integrationsfunktionen
+
+#### Entwicklungsworkflow
 1. **Forken** Sie das Repository auf GitHub
 2. **Klonen** Sie Ihren Fork lokal
-3. **Erstellen** Sie einen Feature-Branch: `git checkout -b feature/ihr-feature-name`
-4. **Entwickeln** Sie Ihre Änderungen
-5. **Testen** Sie gründlich
-6. **Committen** Sie mit klaren Nachrichten
-7. **Pushen** Sie zu Ihrem Fork
-8. **Erstellen** Sie einen Pull Request
+3. **Basis-Branch wählen**:
+   - Verwenden Sie `main` für Bugfixes und allgemeine Verbesserungen
+   - Verwenden Sie `dev` für Masterdata-Updates, API-Änderungen und experimentelle Features
+4. **Erstellen** Sie einen Feature-Branch: `git checkout -b feature/ihr-feature-name`
+5. **Entwickeln** Sie Ihre Änderungen
+6. **Testen** Sie gründlich
+7. **Committen** Sie mit klaren Nachrichten
+8. **Pushen** Sie zu Ihrem Fork
+9. **Erstellen** Sie einen Pull Request auf den entsprechenden Basis-Branch
+
+#### Zweck des Dev-Branches
+Der `dev`-Branch dient als Integrationspunkt für:
+- **Masterdata-Updates**: Änderungen an Stationsdaten, Preisstrukturen oder Deutsche Bahn Datenformaten
+- **API-Integration-Verbesserungen**: Updates für Deutsche Bahn API-Interaktionen, neue Endpunkte oder Request-Behandlung
+- **Experimentelle Features**: Neue Funktionalitäten, die umfangreiches Testen vor dem Produktions-Release erfordern
+
+Dieser Branch ermöglicht kollaborative Entwicklung und einfachere Review komplexer Änderungen, bevor sie in den stabilen `main`-Branch gemergt werden.
 
 ### Coding-Standards
 

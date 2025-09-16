@@ -33,6 +33,14 @@ Ich selbst besitze weder einen Mac noch ein iOS-Gerät, um die App für iOS zu k
 
 ## Development
 
+### Branch Management
+
+Dieses Projekt nutzt zwei Hauptbranches:
+- **`main`**: Produktionscode und stabile Releases
+- **`dev`**: Entwicklungsbranch für neue Masterdata- und API-Integration
+
+Für neue Features und Experimente, besonders für Masterdata-Updates und API-Änderungen, verwende bitte den `dev`-Branch als Basis.
+
 ### Building the app
 
 1. Stelle sicher, dass Flutter auf deinem System installiert ist
