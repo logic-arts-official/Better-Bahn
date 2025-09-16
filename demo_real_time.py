@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from db_transport_api import DBTransportAPIClient
-from main import get_real_time_journey_info, enhance_connection_with_real_time
+from main import get_real_time_journey_info
 
 
 def demo_real_time_features():
@@ -21,8 +21,12 @@ def demo_real_time_features():
     
     # Initialize the API client
     print("\n1️⃣  Initializing v6.db.transport.rest API Client...")
-    client = DBTransportAPIClient(rate_limit_delay=0.1)
-    print("   ✓ Client initialized with 100ms rate limiting")
+    client = DBTransportAPIClient(
+        rate_limit_capacity=10,
+        rate_limit_window=10.0,
+        enable_caching=True
+    )
+    print("   ✓ Client initialized with 10 req/10s rate limiting and caching")
     
     # Demonstrate station search
     print("\n2️⃣  Demonstrating Station Search...")
@@ -30,8 +34,8 @@ def demo_real_time_features():
         locations = client.find_locations("Hamburg Hbf", results=3)
         print(f"   📍 Found {len(locations)} stations for 'Hamburg Hbf':")
         for i, loc in enumerate(locations[:2], 1):
-            coords = f"({loc.latitude:.4f}, {loc.longitude:.4f})" if loc.latitude else "N/A"
-            print(f"      {i}. {loc.name} (ID: {loc.id}) - {coords}")
+            coords = f"({loc.get('latitude', 'N/A')}, {loc.get('longitude', 'N/A')})"
+            print(f"      {i}. {loc.get('name', 'Unknown')} (ID: {loc.get('id', 'Unknown')}) - {coords}")
     except Exception as e:
         print(f"   ⚠️  Station search error: {e}")
     
@@ -61,7 +65,7 @@ def demo_real_time_features():
                 if status['cancelled_legs'] > 0:
                     print(f"         ❌ Cancellations: {status['cancelled_legs']} legs affected")
                 if not status['has_delays'] and status['cancelled_legs'] == 0:
-                    print(f"         ✅ On time, no delays or cancellations")
+                    print("         ✅ On time, no delays or cancellations")
         else:
             print("   ⚠️  No journey data available")
             
@@ -84,7 +88,7 @@ def demo_real_time_features():
             if real_time_info['journeys']:
                 first_journey = real_time_info['journeys'][0]
                 rt_status = first_journey['real_time_status']
-                print(f"      First journey status:")
+                print("      First journey status:")
                 print(f"         Duration: {first_journey['duration_minutes']} minutes")
                 print(f"         Transfers: {first_journey['transfers']}")
                 print(f"         Delays: {rt_status['has_delays']} ({rt_status['total_delay_minutes']}min)")
