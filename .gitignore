@@ -14,3 +14,14 @@ bandit-report.json
 pip-audit-report.json
 safety-report.json
 *-security-report.json
+
+# Testing artifacts
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+*.log
+
