@@ -98,10 +98,44 @@ Results & Booking Links
 - No proxy rotation or advanced rate limiting evasion
 - Sequential processing of price queries
 
+### Recommended Improvements (Based on hafas-client Patterns):
+
+#### Configurable Rate Limiting:
+```python
+class DBAPIClient:
+    def __init__(self, rate_limit_delay=0.5, max_retries=3):
+        self.rate_limit_delay = rate_limit_delay
+        self.max_retries = max_retries
+        
+    def _make_request_with_backoff(self, method, url, **kwargs):
+        """Make request with exponential backoff retry"""
+        for attempt in range(self.max_retries):
+            try:
+                time.sleep(self.rate_limit_delay)
+                response = requests.request(method, url, **kwargs)
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Rate limited
+                    wait_time = (2 ** attempt) * self.rate_limit_delay
+                    time.sleep(wait_time)
+                    continue
+                raise
+        raise DBRateLimitError("Max retries exceeded")
+```
+
+#### Advanced Rate Limiting Features:
+- **Exponential backoff**: Automatically increase delays on rate limit errors
+- **Configurable thresholds**: Allow users to adjust request frequency
+- **Request queuing**: Queue requests to avoid overwhelming the API
+- **Circuit breaker pattern**: Temporarily halt requests after consecutive failures
+
 ### Performance Characteristics:
 - For N stations: O(N²) API calls required
-- Processing time: ~(N² × 0.5) seconds
+- Processing time: ~(N² × 0.5) seconds minimum
 - Memory usage: O(N²) for price matrix storage
+- **New**: Retry overhead: Up to 3x processing time on failures
+- **New**: Caching potential: Reduce duplicate requests by 50-80%
 
 ## Security Considerations
 
@@ -119,16 +153,69 @@ Results & Booking Links
 
 ## Error Handling
 
-### Robust Failure Management:
-- Network request timeouts and retries
+### Current Implementation:
+- Network request timeouts with basic `requests.RequestException` handling
 - Invalid URL detection and user feedback
-- Missing price data graceful degradation
-- Connection failure recovery
+- Missing price data graceful degradation with `None` returns
+- Connection failure recovery through silent failure handling
+
+### Recommended Improvements (Based on hafas-client Analysis):
+
+#### Structured Error Hierarchy:
+```python
+class DBAPIError(Exception):
+    """Base class for all DB API related errors"""
+    def __init__(self, message: str, code: str = None, is_server_error: bool = False):
+        super().__init__(message)
+        self.code = code
+        self.is_server_error = is_server_error
+        self.is_db_error = True
+
+class DBConnectionNotFoundError(DBAPIError):
+    """Raised when no connections found between stations"""
+    pass
+
+class DBRateLimitError(DBAPIError):
+    """Raised when API rate limit is exceeded"""
+    pass
+
+class DBInvalidStationError(DBAPIError):
+    """Raised when station ID is invalid"""
+    pass
+```
+
+#### Enhanced Error Handling Pattern:
+```python
+def get_connection_details_enhanced(from_id, to_id, date, time, traveller_payload, deutschland_ticket):
+    """Enhanced version with structured error handling"""
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        
+        if not data.get("verbindungen"):
+            raise DBConnectionNotFoundError(f"No connections found from {from_id} to {to_id}")
+            
+        return data
+        
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 429:
+            raise DBRateLimitError("API rate limit exceeded")
+        elif e.response.status_code == 400:
+            raise DBInvalidStationError(f"Invalid station parameters: {from_id}, {to_id}")
+        else:
+            raise DBAPIError(f"HTTP {e.response.status_code}: {e.response.text}",
+                           is_server_error=e.response.status_code >= 500)
+    except requests.exceptions.RequestException as e:
+        raise DBAPIError(f"Network error: {str(e)}")
+```
 
 ### Logging & Debugging:
 - Detailed console output for troubleshooting
 - Step-by-step analysis progress reporting
 - Clear error messages for common issues
+- **New**: Structured error codes for programmatic handling
+- **New**: Error context preservation for debugging
 
 ## Static Masterdata Integration
 
@@ -205,16 +292,33 @@ The application integrates static masterdata from the Deutsche Bahn Timetables A
 
 ## Future Enhancement Opportunities
 
-### Technical Improvements:
-1. **Caching System**: Store pricing data to reduce API calls
-2. **Parallel Processing**: Concurrent price queries where possible
-3. **Proxy Support**: Advanced rate limiting evasion
-4. **Configuration System**: User-customizable settings
-5. **Test Coverage**: Comprehensive unit and integration tests
+### Technical Improvements (Inspired by hafas-client):
+1. **Modular API Client Architecture**: Create a dedicated `DBAPIClient` class with consistent interfaces
+2. **Structured Error Handling**: Implement error hierarchy similar to hafas-client's `HafasError` family
+3. **Configurable Rate Limiting**: Add `withThrottling` and `withRetrying` patterns for flexible rate limiting
+4. **Request/Response Logging**: Add `logRequest` and `logResponse` hooks for debugging
+5. **Caching System**: Store pricing data to reduce API calls with cache invalidation
+6. **Parallel Processing**: Concurrent price queries where possible (respecting rate limits)
+7. **Configuration Management**: User-customizable settings following hafas-client's option pattern
+8. **Comprehensive Test Coverage**: Unit and integration tests with mock API responses
+
+### API Integration Enhancements:
+1. **Standardized Data Structures**: Define clear data classes for connections, stations, and prices
+2. **Type Hints and Validation**: Add comprehensive type annotations and input validation
+3. **Authentication Handling**: Prepare for potential future authentication requirements
+4. **Profile System**: Implement endpoint-specific profiles similar to hafas-client
+5. **Response Parsing**: Robust parsing with fallback handling for API changes
 
 ### Feature Additions:
-1. **Historical Price Tracking**: Monitor price trends over time
-2. **Schedule Integration**: Consider departure times in optimization
-3. **Multi-passenger Support**: Group booking optimization
-4. **Alternative Route Suggestions**: Compare different journey paths
-5. **Notification System**: Alert users to price changes
+1. **Historical Price Tracking**: Monitor price trends over time with structured storage
+2. **Schedule Integration**: Consider departure times in optimization with real-time data
+3. **Multi-passenger Support**: Group booking optimization with traveller management
+4. **Alternative Route Suggestions**: Compare different journey paths using route analysis
+5. **Notification System**: Alert users to price changes with configurable thresholds
+6. **Real-time Updates**: Integration with live delay and disruption information
+
+### Documentation Improvements (Following hafas-client Structure):
+1. **Method-specific Documentation**: Create individual files for each API endpoint
+2. **Comprehensive Error Guide**: Document all error types with handling examples
+3. **Usage Patterns Guide**: Show common integration patterns and best practices
+4. **Migration Documentation**: Version-specific upgrade guides for future changes
