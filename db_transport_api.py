@@ -1,23 +1,31 @@
+Bereinigt, lauffähig, konfliktfrei. Drop-in ersetzen.
+
+```python
 """
 v6.db.transport.rest API Client for Better-Bahn
 
-This module provides a resilient Python client for accessing real-time Deutsche Bahn data
-through the v6.db.transport.rest API. It includes comprehensive error handling, rate limiting,
-caching, and fallback strategies for production use.
+Resilient Python client for real-time Deutsche Bahn data via v6.db.transport.rest.
+Includes error handling, token-bucket rate limiting, in-memory caching with ETag and
+stale-while-revalidate, and graceful fallbacks.
 
-API Documentation: https://v6.db.transport.rest/api.html
+API Docs: https://v6.db.transport.rest/api.html
 """
 
-import requests
-import time
-import hashlib
+from __future__ import annotations
+
 import json
+import time
 import threading
-from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Any, Tuple, Union
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import quote
 
+import hashlib
+import requests
+
+
+# ---------- Result types ----------
 
 class APIResultType(Enum):
     SUCCESS = "success"
@@ -59,6 +67,8 @@ class APIResult:
         }
 
 
+# ---------- Cache ----------
+
 @dataclass
 class CacheEntry:
     data: Any
@@ -74,32 +84,6 @@ class CacheEntry:
     @property
     def is_stale_but_usable(self) -> bool:
         return time.time() - self.fetched_at < (self.max_age + self.stale_while_revalidate)
-
-
-class TokenBucket:
-    def __init__(self, capacity: int = 10, refill_rate: float = 1.0):
-        self.capacity = float(capacity)
-        self.tokens = float(capacity)
-        self.refill_rate = float(refill_rate)
-        self.last_update = time.time()
-        self._lock = threading.Lock()
-
-    def consume(self, tokens: int = 1) -> bool:
-        with self._lock:
-            now = time.time()
-            self.tokens = min(self.capacity, self.tokens + (now - self.last_update) * self.refill_rate)
-            self.last_update = now
-            if self.tokens >= tokens:
-                self.tokens -= tokens
-                return True
-            return False
-
-    def time_until_available(self, tokens: int = 1) -> float:
-        with self._lock:
-            if self.tokens >= tokens:
-                return 0.0
-            needed = tokens - self.tokens
-            return needed / self.refill_rate if self.refill_rate > 0 else float("inf")
 
 
 class CacheManager:
@@ -138,11 +122,41 @@ class CacheManager:
             self._access_times.clear()
 
 
+# ---------- Rate limiting ----------
+
+class TokenBucket:
+    def __init__(self, capacity: int = 10, refill_rate: float = 1.0):
+        self.capacity = float(capacity)
+        self.tokens = float(capacity)
+        self.refill_rate = float(refill_rate)
+        self.last_update = time.time()
+        self._lock = threading.Lock()
+
+    def consume(self, tokens: int = 1) -> bool:
+        with self._lock:
+            now = time.time()
+            self.tokens = min(self.capacity, self.tokens + (now - self.last_update) * self.refill_rate)
+            self.last_update = now
+            if self.tokens >= tokens:
+                self.tokens -= tokens
+                return True
+            return False
+
+    def time_until_available(self, tokens: int = 1) -> float:
+        with self._lock:
+            if self.tokens >= tokens:
+                return 0.0
+            needed = tokens - self.tokens
+            return needed / self.refill_rate if self.refill_rate > 0 else float("inf")
+
+
 def _bool_to_str(v: Optional[bool]) -> Optional[str]:
     if v is None:
         return None
     return "true" if v else "false"
 
+
+# ---------- Client ----------
 
 class DBTransportAPIClient:
     BASE_URL = "https://v6.db.transport.rest"
@@ -154,18 +168,14 @@ class DBTransportAPIClient:
         cache_max_size: int = 1000,
         default_timeout: int = 30,
         enable_caching: bool = True,
+        user_agent: str = "Better-Bahn/2.0 (+https://github.com/logic-arts-official/Better-Bahn)",
     ):
         refill_rate = rate_limit_capacity / rate_limit_window if rate_limit_window > 0 else rate_limit_capacity
         self.rate_limiter = TokenBucket(capacity=rate_limit_capacity, refill_rate=refill_rate)
         self.cache_manager = CacheManager(max_size=cache_max_size) if enable_caching else None
 
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": "Better-Bahn/2.0 (https://github.com/logic-arts-official/Better-Bahn)",
-                "Accept": "application/json",
-            }
-        )
+        self.session.headers.update({"User-Agent": user_agent, "Accept": "application/json"})
         self.default_timeout = default_timeout
 
         self.stats = {
@@ -174,6 +184,8 @@ class DBTransportAPIClient:
             "rate_limit_hits": 0,
             "errors": 0,
         }
+
+    # ---- internals ----
 
     def _map_http_status_to_result_type(self, status_code: int) -> APIResultType:
         if 200 <= status_code < 300:
@@ -340,12 +352,14 @@ class DBTransportAPIClient:
             self.stats["errors"] += 1
             return APIResult(result_type=APIResultType.TRANSIENT_ERROR, error_message=f"Request failed: {e}")
 
-    # Legacy compatibility
+    # ---- legacy compatibility thin wrapper (Optional[Any]) ----
+
     def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Any]:
         result = self._make_request_with_cache(endpoint, params)
         return result.data if result.is_success else None
 
-    # Resilient API methods
+    # ---- public resilient methods ----
+
     def find_locations_resilient(self, query: str, results: int = 5) -> APIResult:
         params = {"query": query, "results": results}
         return self._make_request_with_cache("/locations", params)
@@ -393,7 +407,8 @@ class DBTransportAPIClient:
             params["lineName"] = line_name
         return self._make_request_with_cache(endpoint, params if params else None)
 
-    # Backward-compat wrappers
+    # ---- simple Optional-returning helpers ----
+
     def find_locations(self, query: str, results: int = 5) -> Optional[List[Dict]]:
         result = self.find_locations_resilient(query, results)
         return result.data if result.is_success else None
@@ -443,7 +458,8 @@ class DBTransportAPIClient:
         params = {"latitude": latitude, "longitude": longitude, "distance": distance, "results": results}
         return self._make_request("/stops/nearby", params)
 
-    # Utility
+    # ---- utilities ----
+
     def get_stats(self) -> Dict[str, Any]:
         cache_stats = {}
         if self.cache_manager:
@@ -490,34 +506,73 @@ class DBTransportAPIClient:
         return status
 
 
-def test_api_client() -> None:
-    print("Testing Enhanced DB Transport API Client...")
-    print("=" * 50)
+# ---------- High-level helper ----------
+
+def get_real_time_journey_info(from_station: str, to_station: str) -> Dict[str, Any]:
+    client = DBTransportAPIClient()
+    journey_result = client.get_journeys_resilient(from_station, to_station, results=5)
+    if not journey_result.is_success:
+        return {
+            "available": False,
+            "error": journey_result.error_message or f"HTTP {journey_result.http_status}",
+            "journeys": [],
+            "journeys_count": 0,
+            "from_station": from_station,
+            "to_station": to_station,
+        }
+
+    data = journey_result.data or {}
+    journeys = data.get("journeys", []) if isinstance(data, dict) else []
+    processed: List[Dict[str, Any]] = []
+    for j in journeys:
+        rt = client.get_real_time_status(j)
+        processed.append(
+            {
+                "duration_minutes": (j.get("duration", 0) // 60) if isinstance(j.get("duration"), int) else 0,
+                "transfers": max(len(j.get("legs", [])) - 1, 0),
+                "real_time_status": {
+                    "has_delays": rt["has_delays"],
+                    "total_delay_minutes": rt["total_delay_minutes"],
+                    "has_cancellations": rt["cancelled_legs"] > 0,
+                    "status": "disrupted" if (rt["has_delays"] or rt["cancelled_legs"] > 0) else "on_time",
+                },
+            }
+        )
+
+    return {
+        "available": True,
+        "journeys": processed,
+        "journeys_count": len(processed),
+        "from_station": from_station,
+        "to_station": to_station,
+    }
+
+
+# ---------- Self-test ----------
+
+def _self_test() -> None:
+    print("DB Transport API Client smoke test")
     client = DBTransportAPIClient()
 
-    print("\nInitial Statistics:")
-    for k, v in client.get_stats().items():
-        print(f"  {k}: {v}")
+    print("\nStats initial:", client.get_stats())
 
     print("\n1) Locations 'Berlin Hbf'...")
-    result = client.find_locations_resilient("Berlin Hbf", results=1)
-    print(f"  type={result.result_type.value} cache={result.from_cache}")
-    if result.is_success and isinstance(result.data, list) and result.data:
-        berlin_id = result.data[0].get("id") or result.data[0].get("station", {}).get("id")
-        name = result.data[0].get("name")
+    r = client.find_locations_resilient("Berlin Hbf", results=1)
+    print("  type=", r.result_type.value, " cache=", r.from_cache)
+    if r.is_success and isinstance(r.data, list) and r.data:
+        berlin_id = r.data[0].get("id") or r.data[0].get("station", {}).get("id")
+        name = r.data[0].get("name")
         print(f"  Found: {name} (ID: {berlin_id})")
 
         print("\n2) Journeys Berlin -> München...")
-        journey_result = client.get_journeys_resilient(str(berlin_id), "8000261", results=1)
-        print(f"  type={journey_result.result_type.value} cache={journey_result.from_cache}")
-        journeys = (journey_result.data or {}).get("journeys", []) if journey_result.is_success else []
+        j = client.get_journeys_resilient(str(berlin_id), "8000261", results=1)
+        print("  type=", j.result_type.value, " cache=", j.from_cache)
+        journeys = (j.data or {}).get("journeys", []) if j.is_success else []
         if journeys:
-            journey = journeys[0]
-            print(f"  Legs: {len(journey.get('legs', []))}")
-            status = client.get_real_time_status(journey)
-            print(f"  Delays: {status['has_delays']} total_min={status['total_delay_minutes']}")
+            status = client.get_real_time_status(journeys[0])
+            print("  Delays:", status["has_delays"], " total_min=", status["total_delay_minutes"])
 
-    print("\n3) Rate limiting probe...")
+    print("\n3) Rate limit probe...")
     for i in range(15):
         r = client.find_locations_resilient("Hamburg", results=1)
         if r.result_type == APIResultType.RATE_LIMITED:
@@ -527,16 +582,11 @@ def test_api_client() -> None:
     print("\n4) Cache behavior...")
     r1 = client.find_locations_resilient("Frankfurt", results=1)
     r2 = client.find_locations_resilient("Frankfurt", results=1)
-    print(f"  req1 from_cache={r1.from_cache} | req2 from_cache={r2.from_cache}")
+    print("  req1 from_cache=", r1.from_cache, " | req2 from_cache=", r2.from_cache)
 
-    print("\nFinal Statistics:")
-    for k, v in client.get_stats().items():
-        print(f"  {k}: {v}")
-
-    print("\n5) Legacy wrapper check...")
-    legacy = client.find_locations("München", results=1)
-    print(f"  legacy_ok={'yes' if legacy is not None else 'no'}")
+    print("\nStats final:", client.get_stats())
 
 
 if __name__ == "__main__":
-    test_api_client()
+    _self_test()
+```

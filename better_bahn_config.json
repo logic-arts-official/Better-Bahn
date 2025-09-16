@@ -1,0 +1,32 @@
+{
+  "api": {
+    "base_url": "https://v6.db.transport.rest",
+    "timeout": 30,
+    "rate_limit_delay": 0.2,
+    "max_retries": 3,
+    "user_agent": "Better-Bahn/1.0",
+    "exponential_backoff": true,
+    "max_backoff_delay": 60.0,
+    "respect_retry_after": true,
+    "enable_realtime": true
+  },
+  "cache": {
+    "enable_memory_cache": true,
+    "memory_cache_ttl": 30,
+    "memory_cache_max_size": 1000,
+    "enable_disk_cache": false,
+    "disk_cache_ttl": 300,
+    "disk_cache_dir": "/tmp/better_bahn_cache"
+  },
+  "logging": {
+    "enable_metrics": true,
+    "log_level": "INFO",
+    "log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "track_latency": true,
+    "track_status_codes": true,
+    "track_cache_hits": true
+  },
+  "default_age": 30,
+  "default_bahncard": null,
+  "default_deutschland_ticket": false
+}
