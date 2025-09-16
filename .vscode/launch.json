@@ -1,0 +1,17 @@
+{
+  "configurations": [
+    {
+      "args": [
+        "--age",
+        "46",
+        "https://www.bahn.de/buchung/fahrplan/suche#sts=true&so=Gerolstein&zo=HAMBURG&kl=2&r=13:16:KLASSENLOS:1&soid=A%3D1%40O%3DGerolstein%40X%3D6660369%40Y%3D50224009%40U%3D80%40L%3D8000123%40B%3D1%40p%3D1755118759%40i%3DU%C3%97008025037%40&zoid=A%3D1%40O%3DHAMBURG%40X%3D9997434%40Y%3D53557110%40U%3D80%40L%3D8096009%40B%3D1%40p%3D1756936145%40i%3DU%C3%97008002710%40&sot=ST&zot=ST&soei=8000123&zoei=8096009&hd=2025-09-16T07:00:05&hza=D&hz=%5B%5D&ar=false&s=true&d=false&vm=00,01,02,03,04,05,06,07,08,09&fm=false&bp=false&dlt=false&dltv=false"
+      ],
+      "console": "integratedTerminal",
+      "name": "Python Debugger: Current File",
+      "program": "${workspaceFolder}/main.py",
+      "request": "launch",
+      "type": "debugpy"
+    }
+  ],
+  "version": "0.2.0"
+}
