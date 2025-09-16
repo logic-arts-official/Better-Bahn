@@ -1,13 +1,18 @@
+import argparse
+import json
 import requests
+import json
+import time
 import argparse
 from urllib.parse import parse_qs, urlparse, quote
 import time
+import yaml
+import os
+from db_transport_api import DBTransportAPIClient
 
 # --- HILFSFUNKTIONEN ---
 
-
-def create_traveller_payload(age, bahncard_option):
-    """Erstellt das 'reisende' JSON-Objekt basierend auf der ausgewählten BahnCard."""
+def load_timetable_masterdata():
     ermaessigung = {"art": "KEINE_ERMAESSIGUNG", "klasse": "KLASSENLOS"}
     if bahncard_option:
         bc_typ_str, klasse_str = bahncard_option.split("_")
@@ -19,7 +24,7 @@ def create_traveller_payload(age, bahncard_option):
             "typ": "ERWACHSENER",
             "ermaessigungen": [ermaessigung],
             "anzahl": 1,
-            "alter": [],
+            "alter": age,
         }
     ]
 
