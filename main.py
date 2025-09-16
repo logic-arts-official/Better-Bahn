@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse, quote
 import time
 import yaml
 import os
-from db_transport_api import DBTransportAPIClient
+from db_transport_api import DBTransportAPIClient, APIResult, APIResultType
 
 # --- HILFSFUNKTIONEN ---
 
@@ -75,7 +75,7 @@ def create_traveller_payload(age, bahncard_option):
 
 def get_real_time_journey_info(from_station_name, to_station_name, departure_time=None):
     """
-    Holt Echtzeit-Reiseinformationen über die v6.db.transport.rest API.
+    Holt Echtzeit-Reiseinformationen über die v6.db.transport.rest API mit verbesserter Resilience.
     
     Args:
         from_station_name: Name der Abfahrtstation
@@ -88,21 +88,44 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
     try:
         print(f"Hole Echtzeit-Daten für {from_station_name} → {to_station_name}...")
         
-        client = DBTransportAPIClient(rate_limit_delay=0.2)
+        # Verwende die neue resiliente API mit konfigurierbaren Parametern
+        client = DBTransportAPIClient(
+            rate_limit_capacity=10,     # 10 Anfragen
+            rate_limit_window=10.0,     # in 10 Sekunden
+            cache_max_size=500,         # 500 Cache-Einträge
+            enable_caching=True         # Caching aktiviert
+        )
         
-        # Stationen finden
-        from_locations = client.find_locations(from_station_name, results=1)
-        to_locations = client.find_locations(to_station_name, results=1)
+        # Stationen finden mit resilientem API
+        from_result = client.find_locations_resilient(from_station_name, results=1)
+        to_result = client.find_locations_resilient(to_station_name, results=1)
         
-        if not from_locations or not to_locations:
-            print("Warnung: Konnte Stationen nicht über Echtzeit-API finden")
-            return None
+        # Prüfe Ergebnisse und nutze Fallback-Strategien
+        if not from_result.is_success or not from_result.data:
+            print(f"Warnung: Konnte Startstation '{from_station_name}' nicht finden")
+            if from_result.from_cache:
+                print("   -> Verwende gecachte Daten als Fallback")
+            else:
+                print(f"   -> Fehlertyp: {from_result.result_type.value}")
+                if from_result.error_message:
+                    print(f"   -> Details: {from_result.error_message}")
+                return None
+                
+        if not to_result.is_success or not to_result.data:
+            print(f"Warnung: Konnte Zielstation '{to_station_name}' nicht finden")
+            if to_result.from_cache:
+                print("   -> Verwende gecachte Daten als Fallback")
+            else:
+                print(f"   -> Fehlertyp: {to_result.result_type.value}")
+                if to_result.error_message:
+                    print(f"   -> Details: {to_result.error_message}")
+                return None
             
-        from_id = from_locations[0]['id']
-        to_id = to_locations[0]['id']
+        from_id = from_result.data[0]['id']
+        to_id = to_result.data[0]['id']
         
-        # Verbindungen suchen
-        journeys_data = client.get_journeys(
+        # Verbindungen suchen mit resilientem API
+        journeys_result = client.get_journeys_resilient(
             from_id, 
             to_id, 
             departure=departure_time,
@@ -110,15 +133,38 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
             stopovers=True
         )
         
+        if not journeys_result.is_success:
+            print("Warnung: Konnte keine Echtzeit-Verbindungen abrufen")
+            if journeys_result.from_cache:
+                print("   -> Verwende gecachte Verbindungsdaten")
+            elif journeys_result.should_retry:
+                print(f"   -> Vorübergehender Fehler ({journeys_result.result_type.value})")
+                if journeys_result.retry_after:
+                    print(f"   -> Erneuter Versuch in {journeys_result.retry_after}s möglich")
+                return None
+            else:
+                print(f"   -> Permanenter Fehler ({journeys_result.result_type.value})")
+                return None
+        
+        journeys_data = journeys_result.data
         if not journeys_data or 'journeys' not in journeys_data:
-            print("Warnung: Keine Echtzeit-Verbindungen gefunden")
+            print("Warnung: Keine Echtzeit-Verbindungen in Antwort gefunden")
             return None
             
         real_time_info = {
             'available': True,
             'journeys_count': len(journeys_data['journeys']),
-            'journeys': []
+            'journeys': [],
+            'from_cache': journeys_result.from_cache,
+            'data_age_seconds': time.time() - journeys_result.cached_at if journeys_result.cached_at else 0
         }
+        
+        # Status-Information für den Benutzer
+        if journeys_result.from_cache:
+            age_min = real_time_info['data_age_seconds'] / 60
+            print(f"   -> Nutze gecachte Daten (Alter: {age_min:.1f}min)")
+        else:
+            print("   -> Aktuelle Daten vom Server erhalten")
         
         for journey in journeys_data['journeys'][:2]:  # Nur erste 2 Verbindungen
             status = client.get_real_time_status(journey)
@@ -130,10 +176,18 @@ def get_real_time_journey_info(from_station_name, to_station_name, departure_tim
             }
             real_time_info['journeys'].append(journey_info)
         
+        # API-Statistiken für Debugging (nur bei Bedarf anzeigen)
+        stats = client.get_stats()
+        if stats['cache_hits'] > 0 or stats['rate_limit_hits'] > 0:
+            print(f"   -> API-Statistiken: {stats['requests_made']} Anfragen, "
+                  f"{stats['cache_hits']} Cache-Treffer, "
+                  f"{stats['rate_limit_hits']} Rate-Limit-Treffer")
+        
         return real_time_info
         
     except Exception as e:
         print(f"Fehler beim Abrufen der Echtzeit-Daten: {e}")
+        print("   -> Fallback: Verwende nur bahn.de Basisdaten")
         return None
 
 
