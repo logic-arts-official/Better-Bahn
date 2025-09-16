@@ -5,9 +5,58 @@ import json
 import time
 import argparse
 from urllib.parse import parse_qs, urlparse, quote
-
+import time
+import yaml
+import os
+from db_transport_api import DBTransportAPIClient
 
 # --- HILFSFUNKTIONEN ---
+
+def load_timetable_masterdata():
+    """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as file:
+            masterdata = yaml.safe_load(file)
+            print(
+                f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+            )
+            return masterdata
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+        return None
+    except yaml.YAMLError as e:
+        print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+        return None
+
+
+def get_station_schema():
+    """Gibt das Schema für Stationsdaten aus den Masterdaten zurück."""
+    masterdata = load_timetable_masterdata()
+    if (
+        masterdata
+        and "components" in masterdata
+        and "schemas" in masterdata["components"]
+    ):
+        return masterdata["components"]["schemas"]
+    return None
+
+
+def validate_eva_number(eva_no):
+    """Validiert eine EVA-Stationsnummer gegen das Schema."""
+    if not isinstance(eva_no, (int, str)):
+        return False
+    try:
+        # EVA-Nummern sind normalerweise 7-stellige Zahlen
+        eva_int = int(eva_no)
+        return 1000000 <= eva_int <= 9999999
+    except (ValueError, TypeError):
+        return False
 
 
 def create_traveller_payload(age, bahncard_option):
@@ -26,6 +75,98 @@ def create_traveller_payload(age, bahncard_option):
             "alter": [],
         }
     ]
+
+
+def get_real_time_journey_info(from_station_name, to_station_name, departure_time=None):
+    """
+    Holt Echtzeit-Reiseinformationen über die v6.db.transport.rest API.
+    
+    Args:
+        from_station_name: Name der Abfahrtstation
+        to_station_name: Name der Zielstation  
+        departure_time: Abfahrtszeit (optional)
+        
+    Returns:
+        Dictionary mit Echtzeit-Informationen oder None bei Fehler
+    """
+    try:
+        print(f"Hole Echtzeit-Daten für {from_station_name} → {to_station_name}...")
+        
+        client = DBTransportAPIClient(rate_limit_delay=0.2)
+        
+        # Stationen finden
+        from_locations = client.find_locations(from_station_name, results=1)
+        to_locations = client.find_locations(to_station_name, results=1)
+        
+        if not from_locations or not to_locations:
+            print("Warnung: Konnte Stationen nicht über Echtzeit-API finden")
+            return None
+            
+        from_id = from_locations[0]['id']
+        to_id = to_locations[0]['id']
+        
+        # Verbindungen suchen
+        journeys_data = client.get_journeys(
+            from_id, 
+            to_id, 
+            departure=departure_time,
+            results=3,
+            stopovers=True
+        )
+        
+        if not journeys_data or 'journeys' not in journeys_data:
+            print("Warnung: Keine Echtzeit-Verbindungen gefunden")
+            return None
+            
+        real_time_info = {
+            'available': True,
+            'journeys_count': len(journeys_data['journeys']),
+            'journeys': []
+        }
+        
+        for journey in journeys_data['journeys'][:2]:  # Nur erste 2 Verbindungen
+            status = client.get_real_time_status(journey)
+            journey_info = {
+                'duration_minutes': journey.get('duration', 0) // 60 if journey.get('duration') else 0,
+                'transfers': len(journey.get('legs', [])) - 1,
+                'real_time_status': status,
+                'legs_count': len(journey.get('legs', []))
+            }
+            real_time_info['journeys'].append(journey_info)
+        
+        return real_time_info
+        
+    except Exception as e:
+        print(f"Fehler beim Abrufen der Echtzeit-Daten: {e}")
+        return None
+
+
+def enhance_connection_with_real_time(connection_data, real_time_info):
+    """
+    Erweitert Verbindungsdaten um Echtzeit-Informationen.
+    
+    Args:
+        connection_data: Bestehende Verbindungsdaten von bahn.de
+        real_time_info: Echtzeit-Daten von v6.db.transport.rest
+        
+    Returns:
+        Erweiterte Verbindungsdaten
+    """
+    if not real_time_info or not real_time_info.get('available'):
+        return connection_data
+    
+    # Echtzeit-Status zu den Verbindungen hinzufügen
+    if 'verbindungen' in connection_data and connection_data['verbindungen']:
+        first_connection = connection_data['verbindungen'][0]
+        
+        if real_time_info['journeys']:
+            first_journey = real_time_info['journeys'][0]
+            first_connection['echtzeit_status'] = first_journey['real_time_status']
+            first_connection['echtzeit_verfügbar'] = True
+        else:
+            first_connection['echtzeit_verfügbar'] = False
+    
+    return connection_data
 
 
 # --- API-FUNKTIONEN ---
@@ -289,8 +430,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Geben Sie an, ob ein Deutschland-Ticket vorhanden ist.",
     )
+    parser.add_argument(
+        "--real-time",
+        action="store_true",
+        default=True,
+        help="Echtzeit-Daten über v6.db.transport.rest API abrufen (Standard: aktiviert).",
+    )
+    parser.add_argument(
+        "--no-real-time",
+        dest="real_time",
+        action="store_false",
+        help="Echtzeit-Daten deaktivieren (nur bahn.de Basisdaten verwenden).",
+    )
 
     args = parser.parse_args()
+
+    # Lade statische Fahrplan-Masterdaten
+    print("--- Initialisierung ---")
+    masterdata = load_timetable_masterdata()
+
     traveller_payload = create_traveller_payload(args.age, args.bahncard)
 
     connection_data, date_part = None, None
@@ -337,6 +495,44 @@ if __name__ == "__main__":
     if not connection_data or not connection_data.get("verbindungen"):
         print("Konnte keine Verbindungsdetails für den angegebenen Link abrufen.")
         exit()
+
+    # --- ECHTZEIT-DATEN INTEGRATION ---
+    if args.real_time:
+        print("\n--- Integriere Echtzeit-Daten ---")
+        
+        # Extrahiere Stationsnamen für Echtzeit-Abfrage
+        first_connection = connection_data["verbindungen"][0]
+        
+        if "verbindungsAbschnitte" in first_connection and first_connection["verbindungsAbschnitte"]:
+            start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0]["bahnhofsName"]
+            end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1]["bahnhofsName"]
+            
+            # Hole Echtzeit-Informationen
+            real_time_info = get_real_time_journey_info(start_station, end_station, date_part)
+            
+            # Erweitere Verbindungsdaten um Echtzeit-Informationen
+            connection_data = enhance_connection_with_real_time(connection_data, real_time_info)
+            
+            # Zeige Echtzeit-Status an
+            if real_time_info and real_time_info.get('available'):
+                print(f"✓ Echtzeit-Daten erfolgreich integriert ({real_time_info['journeys_count']} Verbindungen)")
+                
+                if real_time_info['journeys']:
+                    first_journey = real_time_info['journeys'][0]
+                    rt_status = first_journey['real_time_status']
+                    
+                    if rt_status['has_delays']:
+                        print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
+                    if rt_status['cancelled_legs'] > 0:
+                        print(f"❌ Ausfälle: {rt_status['cancelled_legs']} Teilstrecken betroffen")
+                    if not rt_status['has_delays'] and rt_status['cancelled_legs'] == 0:
+                        print("✅ Aktuell keine Verspätungen oder Ausfälle")
+            else:
+                print("⚠️  Echtzeit-Daten momentan nicht verfügbar")
+        else:
+            print("⚠️  Konnte Stationsnamen für Echtzeit-Abfrage nicht extrahieren")
+    else:
+        print("\n--- Echtzeit-Daten deaktiviert ---")
 
     print("\n--- Analysiere die Verbindung ---")
     print(f"Datum: {date_part}")
