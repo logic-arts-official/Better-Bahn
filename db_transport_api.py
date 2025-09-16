@@ -112,6 +112,18 @@ class DBTransportAPIClient:
         # Check feature flag
         if not self.config.enable_realtime:
             self.logger.debug("Real-time API disabled by feature flag")
+
+        try:
+            url = f"{self.BASE_URL}{endpoint}"
+            response = self.session.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except (ValueError, TypeError) as e:
+            # Handle JSON parsing errors
+            print(f"DB Transport API JSON parsing failed: {e}")
+            return None
+        except requests.RequestException as e:
+            print(f"DB Transport API request failed: {e}")
             return None
         
         # Create cache key
@@ -466,15 +478,18 @@ class DBTransportAPIClient:
                 if 'delay' in leg['departure'] and leg['departure']['delay'] is not None:
                     leg_status['departure_delay'] = leg['departure']['delay'] // 60  # Convert to minutes
                     status['total_delay_minutes'] += leg_status['departure_delay']
-                    status['has_delays'] = True
+                    if leg_status['departure_delay'] > 0:
+                        status['has_delays'] = True
             
             # Check arrival delay  
             if 'arrival' in leg and leg['arrival']:
                 if 'delay' in leg['arrival'] and leg['arrival']['delay'] is not None:
                     leg_status['arrival_delay'] = leg['arrival']['delay'] // 60  # Convert to minutes
                     if leg_status['arrival_delay'] > leg_status['departure_delay']:
-                        status['total_delay_minutes'] += (leg_status['arrival_delay'] - leg_status['departure_delay'])
-                        status['has_delays'] = True
+                        additional_delay = leg_status['arrival_delay'] - leg_status['departure_delay']
+                        status['total_delay_minutes'] += additional_delay
+                        if additional_delay > 0:
+                            status['has_delays'] = True
             
             # Check cancellation
             if leg.get('cancelled'):

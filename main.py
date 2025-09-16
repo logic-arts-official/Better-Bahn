@@ -1,4 +1,8 @@
+import argparse
+import json
 import requests
+import json
+import time
 import argparse
 from urllib.parse import parse_qs, urlparse, quote
 import time
@@ -6,30 +10,62 @@ import yaml
 import os
 from better_bahn_config import BetterBahnConfig
 from db_transport_api import DBTransportAPIClient, get_real_time_journey_info
+from departure_board import DepartureBoardService
+
 
 # --- HILFSFUNKTIONEN ---
 
 def load_timetable_masterdata():
-    """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
-
+    """Lädt die statische Fahrplan-Masterdaten mit verbesserter Validierung und Typisierung."""
     try:
-        with open(yaml_path, "r", encoding="utf-8") as file:
-            masterdata = yaml.safe_load(file)
-            print(
-                f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
-            )
-            return masterdata
-    except FileNotFoundError:
-        print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
-        return None
-    except yaml.YAMLError as e:
-        print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
-        return None
+        from masterdata_loader import load_timetable_masterdata as load_masterdata_typed
+        # Use the new strongly typed loader
+        masterdata_obj = load_masterdata_typed()
+        return masterdata_obj.raw_data
+    except ImportError:
+        # Fallback to original implementation if new modules not available
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as file:
+                masterdata = yaml.safe_load(file)
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
+                return masterdata
+        except FileNotFoundError:
+            print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+            return None
+        except yaml.YAMLError as e:
+            print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+            return None
+        except Exception as e:
+            print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+            return None
     except Exception as e:
-        print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
-        return None
+        print(f"⚠️ Fehler beim Laden der typisierter Masterdaten: {e}")
+        print("Fallback auf ursprüngliche Implementierung...")
+        # Fallback to original implementation
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as file:
+                masterdata = yaml.safe_load(file)
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
+                return masterdata
+        except FileNotFoundError:
+            print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+            return None
+        except yaml.YAMLError as e:
+            print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+            return None
+        except Exception as e:
+            print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+            return None
 
 
 def get_station_schema():
@@ -111,12 +147,12 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
 
 
 def get_connection_details(
-    from_station_id,
-    to_station_id,
-    date,
-    departure_time,
-    traveller_payload,
-    deutschland_ticket,
+        from_station_id,
+        to_station_id,
+        date,
+        departure_time,
+        traveller_payload,
+        deutschland_ticket,
 ):
     """Ruft Verbindungsdetails ab (für lange URLs oder Teilstrecken)."""
     url = "https://www.bahn.de/web/api/angebote/fahrplan"
@@ -321,7 +357,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
-        "url", help="Der vollständige URL (lang oder kurz mit vbid) von bahn.de"
+        "url", nargs='?', help="Der vollständige URL (lang oder kurz mit vbid) von bahn.de"
     )
     parser.add_argument(
         "--age", type=int, default=30, help="Alter des Reisenden (Standard: 30)."
@@ -348,8 +384,66 @@ if __name__ == "__main__":
         action="store_false",
         help="Echtzeit-Daten deaktivieren (nur bahn.de Basisdaten verwenden).",
     )
+    parser.add_argument(
+        "--departure-board",
+        action="store_true",
+        help="Abfahrtstafel für Start- oder Zielbahnhof anzeigen (erfordert --station)",
+    )
+    parser.add_argument(
+        "--station",
+        help="Bahnhof für Abfahrtstafel (Name oder EVA-Nummer)",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo-Modus für Abfahrtstafel mit Beispieldaten",
+    )
 
     args = parser.parse_args()
+
+    # Handle departure board mode
+    if args.departure_board:
+        if not args.station and not args.demo:
+            print("❌ Fehler: --departure-board erfordert --station oder --demo")
+            print("💡 Beispiel: main.py 'dummy_url' --departure-board --station 'Berlin Hbf'")
+            print("💡 Oder Demo: main.py 'dummy_url' --departure-board --demo")
+            exit(1)
+        
+        print("🚂 Better-Bahn Abfahrtstafel-Modus")
+        print("=" * 50)
+        
+        departure_service = DepartureBoardService()
+        
+        if args.demo:
+            print("🎭 Demo-Modus aktiviert - Zeige Beispieldaten")
+            board = departure_service.create_demo_departure_board(args.station or "Berlin Hbf")
+        else:
+            # Find station if it's not a numeric EVA number
+            station_id = args.station
+            if not args.station.isdigit():
+                print(f"Suche Station: {args.station}...")
+                station_info = departure_service.find_station_by_name(args.station)
+                if not station_info:
+                    print(f"❌ Station '{args.station}' nicht gefunden.")
+                    exit(1)
+                station_id = station_info['id']
+                print(f"✓ Station gefunden: {station_info['name']} (EVA: {station_id})")
+            
+            print(f"\n📡 Lade Abfahrtsdaten für Station {station_id}...")
+            board = departure_service.create_departure_board(station_id=station_id)
+        
+        if board:
+            print("\n" + departure_service.format_departure_board(board, max_entries=15))
+        else:
+            print("❌ Keine Abfahrtsdaten verfügbar.")
+        
+        exit(0)
+    
+    # Validate that URL is provided for normal split-ticket analysis
+    if not args.url:
+        print("❌ Fehler: URL ist erforderlich für Split-Ticket-Analyse")
+        print("💡 Verwenden Sie --departure-board für Abfahrtstafeln")
+        exit(1)
 
     # Lade statische Fahrplan-Masterdaten
     print("--- Initialisierung ---")
