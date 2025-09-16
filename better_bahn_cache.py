@@ -271,16 +271,22 @@ class DiskCache:
             for cache_file in self.cache_dir.glob("*.cache"):
                 try:
                     with open(cache_file, 'rb') as f:
-                        entry = pickle.load(f)
+                        try:
+                            entry = pickle.load(f)
+                        except (pickle.PickleError, EOFError):
+                            # Remove corrupted files
+                            cache_file.unlink(missing_ok=True)
+                            removed_count += 1
+                            continue
                     
                     if isinstance(entry, CacheEntry) and entry.is_expired:
                         cache_file.unlink(missing_ok=True)
                         removed_count += 1
                         
-                except (OSError, pickle.PickleError, EOFError):
-                    # Remove corrupted files
-                    cache_file.unlink(missing_ok=True)
-                    removed_count += 1
+                except OSError as e:
+                    # Log and skip files with access issues
+                    self.logger.warning(f"Could not access cache file {cache_file.name}: {e}")
+                    continue
             
             if removed_count > 0:
                 self.logger.info(f"Cleaned up {removed_count} expired disk cache entries")
