@@ -23,8 +23,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "jsonschema", specifier = ">=4.10.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", specifier = ">=2.32.4" },
 ]
 
