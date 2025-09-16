@@ -139,7 +139,7 @@ Better-Bahn/
 - Break complex widgets into smaller components
 - Handle network errors gracefully in UI
 - Test on multiple screen sizes
-- **Design System**: Uses DB Design System v3.1.1 with DB Sans and DB Head fonts
+- **Design System**: Uses DB Design System v3.1.1 with Google Fonts Lato (replacing proprietary DB fonts)
 - **Theme support**: Implements both light and dark themes (`DBTheme.lightTheme`, `DBTheme.darkTheme`)
 - **State management**: Uses StatefulWidget pattern for user interactions
 
