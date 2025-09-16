@@ -35,7 +35,7 @@ def demo_real_time_features():
         print(f"   📍 Found {len(locations)} stations for 'Hamburg Hbf':")
         for i, loc in enumerate(locations[:2], 1):
             coords = f"({loc.get('latitude', 'N/A')}, {loc.get('longitude', 'N/A')})"
-            print(f"      {i}. {loc['name']} (ID: {loc['id']}) - {coords}")
+            print(f"      {i}. {loc.get('name', 'Unknown')} (ID: {loc.get('id', 'Unknown')}) - {coords}")
     except Exception as e:
         print(f"   ⚠️  Station search error: {e}")
     
