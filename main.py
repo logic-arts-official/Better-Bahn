@@ -1,4 +1,8 @@
+import argparse
+import json
 import requests
+import json
+import time
 import argparse
 from urllib.parse import parse_qs, urlparse, quote
 import time
@@ -202,12 +206,12 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
 
 
 def get_connection_details(
-    from_station_id,
-    to_station_id,
-    date,
-    departure_time,
-    traveller_payload,
-    deutschland_ticket,
+        from_station_id,
+        to_station_id,
+        date,
+        departure_time,
+        traveller_payload,
+        deutschland_ticket,
 ):
     """Ruft Verbindungsdetails ab (für lange URLs oder Teilstrecken)."""
     url = "https://www.bahn.de/web/api/angebote/fahrplan"
