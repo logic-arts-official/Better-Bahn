@@ -10,9 +10,8 @@ API Documentation: https://v6.db.transport.rest/api.html
 
 import requests
 import time
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List
 from urllib.parse import quote
-import json
 
 
 class DBTransportAPIClient:
@@ -275,7 +274,7 @@ class DBTransportAPIClient:
                         status['has_delays'] = True
             
             # Check cancellation
-            if leg.get('cancelled') == True:
+            if leg.get('cancelled'):
                 leg_status['cancelled'] = True
                 status['cancelled_legs'] += 1
             
