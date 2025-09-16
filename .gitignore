@@ -9,6 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# Security reports (should not be committed to avoid exposing vulnerabilities)
+bandit-report.json
+pip-audit-report.json
+safety-report.json
+*-security-report.json
+
 # Testing artifacts
 .pytest_cache/
 .hypothesis/
@@ -18,3 +24,4 @@ htmlcov/
 # Environment files
 .env
 *.log
+
