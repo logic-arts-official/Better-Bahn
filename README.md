@@ -157,6 +157,15 @@ Wenn diese App Ihnen geholfen hat, bei Ihren Bahnreisen Geld zu sparen, wäre es
 
 Sie finden die Spendenmöglichkeiten über den "Sponsor"-Button oben auf dieser GitHub-Seite.
 
+## Documentation
+
+Das Projekt enthält umfassende Dokumentation in `docs/`:
+
+- **[HAFAS_CLIENT_ANALYSIS.md](docs/HAFAS_CLIENT_ANALYSIS.md)** - Detaillierte Analyse des hafas-client Projekts und Vergleich mit Better-Bahn
+- **[IMPLEMENTATION_RECOMMENDATIONS.md](docs/IMPLEMENTATION_RECOMMENDATIONS.md)** - Spezifische Empfehlungen für Verbesserungen basierend auf hafas-client Patterns
+- **[TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Erweiterte technische Dokumentation mit hafas-client inspirierten Verbesserungen
+- **[API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)** - Verbesserte API-Dokumentation mit strukturierter Fehlerbehandlung
+
 ## Beitragen
 
 Beiträge sind willkommen! Bitte öffne ein Issue oder einen Pull Request, wenn du Verbesserungen vorschlagen möchtest.
