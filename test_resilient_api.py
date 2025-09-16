@@ -9,8 +9,7 @@ including Result types, rate limiting, caching, and fallback strategies.
 import unittest
 import time
 import threading
-from unittest.mock import Mock, patch, MagicMock
-import requests
+from unittest.mock import Mock, patch
 
 from db_transport_api import (
     DBTransportAPIClient, 

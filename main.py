@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse, quote
 import time
 import yaml
 import os
-from db_transport_api import DBTransportAPIClient, APIResult, APIResultType
+from db_transport_api import DBTransportAPIClient
 
 # --- HILFSFUNKTIONEN ---
 

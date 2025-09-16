@@ -22,7 +22,7 @@ import json
 import threading
 from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Union, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple
 from urllib.parse import quote
 
 
@@ -423,7 +423,7 @@ class DBTransportAPIClient:
             
             try:
                 error_details = response.text[:500]  # Limit error message length
-            except:
+            except Exception:
                 error_details = f"HTTP {response.status_code}"
             
             return APIResult(
@@ -865,11 +865,11 @@ def test_api_client():
                 status = client.get_real_time_status(journey)
                 print(f"   Real-time status: {status['has_delays']} delays, {status['total_delay_minutes']} min total")
         else:
-            print(f"   Journey search failed or no data available")
+            print("   Journey search failed or no data available")
             if journey_result.error_message:
                 print(f"   Error: {journey_result.error_message}")
     else:
-        print(f"   Location search failed or no data available")
+        print("   Location search failed or no data available")
         if result.error_message:
             print(f"   Error: {result.error_message}")
     
