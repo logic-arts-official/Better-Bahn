@@ -12,13 +12,12 @@ from unittest.mock import Mock, patch, MagicMock
 import requests
 from io import StringIO
 
-# Add the current directory to sys.path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Local imports (assumes this test is part of a package; see README for setup)
 
-from better_bahn_config import BetterBahnConfig, APIConfig, CacheConfig, LoggingConfig
-from better_bahn_cache import CacheManager, MemoryCache, DiskCache
-from better_bahn_metrics import MetricsCollector
-from db_transport_api import DBTransportAPIClient, get_real_time_journey_info, Location
+from .better_bahn_config import BetterBahnConfig, APIConfig, CacheConfig, LoggingConfig
+from .better_bahn_cache import CacheManager, MemoryCache, DiskCache
+from .better_bahn_metrics import MetricsCollector
+from .db_transport_api import DBTransportAPIClient, get_real_time_journey_info, Location
 
 
 class TestAPIResponses(unittest.TestCase):
