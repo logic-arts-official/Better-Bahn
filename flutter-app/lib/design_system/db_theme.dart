@@ -297,7 +297,7 @@ class DBTheme {
     ),
     
     // Card Theme
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 2,
       shadowColor: DBColors.dbGray900.withOpacity(0.12),
       shape: RoundedRectangleBorder(
@@ -484,7 +484,7 @@ class DBTheme {
     ),
     
     // Dark theme components follow similar pattern...
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.3),
       shape: RoundedRectangleBorder(
