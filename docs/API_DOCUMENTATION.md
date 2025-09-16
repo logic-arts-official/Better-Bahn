@@ -2,9 +2,185 @@
 
 ## Overview
 
-This document details the unofficial Deutsche Bahn API endpoints that Better-Bahn uses to gather pricing and connection information. These endpoints are reverse-engineered from browser interactions with bahn.de, following patterns similar to those documented in the [hafas-client project](https://github.com/public-transport/hafas-client).
+This document details the API integrations that Better-Bahn uses to gather pricing and connection information. Better-Bahn now integrates with two complementary APIs:
 
-⚠️ **Important**: These are unofficial APIs that could change without notice. The endpoints are not officially supported by Deutsche Bahn.
+1. **Deutsche Bahn Web API (bahn.de)** - Primary API for pricing and split-ticket analysis
+2. **v6.db.transport.rest API** - Real-time journey data, delays, and live information
+
+⚠️ **Important**: The Deutsche Bahn web API endpoints are unofficial and reverse-engineered from browser interactions with bahn.de. These could change without notice.
+
+✅ **Official**: The v6.db.transport.rest API is a community-maintained, stable interface to Deutsche Bahn's HAFAS system.
+
+## Real-time API Integration (v6.db.transport.rest)
+
+### API Base URL
+```
+https://v6.db.transport.rest
+```
+
+### Key Features
+- **Live delay information** for trains and connections
+- **Station search** with geographic coordinates
+- **Journey planning** with real-time updates
+- **Cancellation detection** for affected services
+- **Rate limiting compliance** (200ms delays)
+
+### Common Headers
+```http
+User-Agent: Better-Bahn/1.0 (Application Name)
+Accept: application/json
+```
+
+### Rate Limiting
+- **Implementation**: 200ms delay between requests
+- **Compliance**: Respectful usage to avoid server overload
+- **Fallback**: Graceful degradation when API unavailable
+
+## Deutsche Bahn Web API (Legacy)
+
+### API Base URL
+```
+https://www.bahn.de/web/api
+```
+
+### Common Headers
+```http
+User-Agent: Mozilla/5.0 (compatible browser string)
+Accept: application/json
+Content-Type: application/json; charset=UTF-8
+Accept-Language: de
+```
+
+### Rate Limiting
+- **Current Implementation**: 0.5 second delay between requests
+- **Recommendation**: Respect server resources, avoid aggressive querying
+- **Risk**: Too many requests may result in IP blocking
+
+## Real-time API Endpoints (v6.db.transport.rest)
+
+### 1. Location Search
+
+**Purpose**: Find stations by name or query
+
+#### Endpoint
+```http
+GET /locations?query={query}&results={count}
+```
+
+#### Parameters
+- `query`: Station name or search term
+- `results`: Maximum number of results (default: 5)
+
+#### Example Request
+```http
+GET https://v6.db.transport.rest/locations?query=Berlin%20Hbf&results=1
+Accept: application/json
+```
+
+#### Response Structure
+```json
+[
+  {
+    "id": "8011160",
+    "name": "Berlin Hbf",
+    "type": "station",
+    "location": {
+      "type": "location",
+      "id": "8011160",
+      "latitude": 52.524925,
+      "longitude": 13.369629
+    }
+  }
+]
+```
+
+### 2. Journey Planning
+
+**Purpose**: Get journey options with real-time data
+
+#### Endpoint
+```http
+GET /journeys?from={fromId}&to={toId}&departure={when}&results={count}&stopovers={bool}
+```
+
+#### Parameters
+- `from`: Origin station ID
+- `to`: Destination station ID  
+- `departure`: Departure time (ISO string, optional)
+- `results`: Number of journey results (default: 3)
+- `stopovers`: Include intermediate stops (default: true)
+
+#### Example Request
+```http
+GET https://v6.db.transport.rest/journeys?from=8011160&to=8000261&results=3&stopovers=true
+Accept: application/json
+```
+
+#### Response Structure
+```json
+{
+  "journeys": [
+    {
+      "type": "journey",
+      "legs": [
+        {
+          "origin": {
+            "id": "8011160",
+            "name": "Berlin Hbf"
+          },
+          "destination": {
+            "id": "8000261", 
+            "name": "München Hbf"
+          },
+          "departure": {
+            "when": "2024-03-15T08:30:00+01:00",
+            "delay": 0
+          },
+          "arrival": {
+            "when": "2024-03-15T12:45:00+01:00", 
+            "delay": 300
+          },
+          "cancelled": false
+        }
+      ],
+      "duration": 15900000
+    }
+  ]
+}
+```
+
+### 3. Real-time Status Information
+
+**Purpose**: Extract delay and cancellation information from journey data
+
+#### Key Fields for Real-time Status
+- `departure.delay`: Departure delay in seconds
+- `arrival.delay`: Arrival delay in seconds  
+- `cancelled`: Boolean indicating if leg is cancelled
+- `duration`: Total journey time in milliseconds
+
+#### Status Processing
+```python
+def extract_real_time_status(journey_data):
+    status = {
+        'has_delays': False,
+        'total_delay_minutes': 0,
+        'cancelled_legs': 0
+    }
+    
+    for leg in journey_data.get('legs', []):
+        # Check delays
+        if leg.get('departure', {}).get('delay'):
+            delay_min = leg['departure']['delay'] // 60
+            status['total_delay_minutes'] += delay_min
+            status['has_delays'] = True
+            
+        # Check cancellations
+        if leg.get('cancelled'):
+            status['cancelled_legs'] += 1
+    
+    return status
+```
 
 ## Comparison with HAFAS Standards
 
