@@ -375,8 +375,20 @@ class BetterBahnConfig:
             data = json.load(f)
         
         # Parse and validate configuration
-        # Implementation here
-        pass
+        api_config = DBAPIConfig(
+            rate_limit_delay=float(data.get('rate_limit_delay', 0.5)),
+            max_retries=int(data.get('max_retries', 3)),
+            timeout=int(data.get('timeout', 30))
+        )
+        return cls(
+            api_config=api_config,
+            default_age=int(data.get('default_age', 30)),
+            default_bahncard=data.get('default_bahncard'),
+            default_deutschland_ticket=bool(data.get('default_deutschland_ticket', False)),
+            enable_caching=bool(data.get('enable_caching', True)),
+            cache_ttl_minutes=int(data.get('cache_ttl_minutes', 10)),
+            parallel_requests=bool(data.get('parallel_requests', False))
+        )
 ```
 
 ### 2. Caching Layer
