@@ -2,8 +2,51 @@ import requests
 import argparse
 from urllib.parse import parse_qs, urlparse, quote
 import time
+import yaml
+import os
 
 # --- HILFSFUNKTIONEN ---
+
+
+def load_timetable_masterdata():
+    """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+    
+    try:
+        with open(yaml_path, 'r', encoding='utf-8') as file:
+            masterdata = yaml.safe_load(file)
+            print(f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})")
+            return masterdata
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+        return None
+    except yaml.YAMLError as e:
+        print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+        return None
+
+
+def get_station_schema():
+    """Gibt das Schema für Stationsdaten aus den Masterdaten zurück."""
+    masterdata = load_timetable_masterdata()
+    if masterdata and 'components' in masterdata and 'schemas' in masterdata['components']:
+        return masterdata['components']['schemas']
+    return None
+
+
+def validate_eva_number(eva_no):
+    """Validiert eine EVA-Stationsnummer gegen das Schema."""
+    if not isinstance(eva_no, (int, str)):
+        return False
+    try:
+        # EVA-Nummern sind normalerweise 7-stellige Zahlen
+        eva_int = int(eva_no)
+        return 1000000 <= eva_int <= 9999999
+    except (ValueError, TypeError):
+        return False
 
 
 def create_traveller_payload(age, bahncard_option):
@@ -287,6 +330,11 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    
+    # Lade statische Fahrplan-Masterdaten
+    print("--- Initialisierung ---")
+    masterdata = load_timetable_masterdata()
+    
     traveller_payload = create_traveller_payload(args.age, args.bahncard)
 
     connection_data, date_part = None, None

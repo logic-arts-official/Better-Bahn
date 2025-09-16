@@ -42,6 +42,9 @@ The application implements a dynamic programming approach to find the optimal co
 
 #### Key Functions:
 
+- `load_timetable_masterdata()`: Loads static timetable schema and metadata from YAML
+- `get_station_schema()`: Provides access to Deutsche Bahn API schema definitions
+- `validate_eva_number()`: Validates EVA station numbers against expected format
 - `resolve_vbid_to_connection()`: Converts short links to full connection data
 - `get_connection_details()`: Fetches route and pricing information
 - `get_segment_data()`: Analyzes individual route segments
@@ -49,10 +52,12 @@ The application implements a dynamic programming approach to find the optimal co
 - `generate_booking_link()`: Creates deep links for ticket purchasing
 
 #### Supported Features:
-- BahnCard discounts (25/50, 1st/2nd class)
-- Deutschland-Ticket integration
-- Age-based pricing
-- Direct booking link generation
+- **Static Masterdata**: Timetables API v1.0.213 schema definitions and validation
+- **Station Data Validation**: EVA number format validation and schema compliance
+- **BahnCard discounts** (25/50, 1st/2nd class)
+- **Deutschland-Ticket integration**
+- **Age-based pricing**
+- **Direct booking link generation**
 
 ### Flutter Frontend
 
@@ -124,6 +129,51 @@ Results & Booking Links
 - Detailed console output for troubleshooting
 - Step-by-step analysis progress reporting
 - Clear error messages for common issues
+
+## Static Masterdata Integration
+
+### Timetables API Schema (v1.0.213)
+
+The application integrates static masterdata from the Deutsche Bahn Timetables API specification:
+
+**Location**: `data/Timetables-1.0.213.yaml`
+**Format**: OpenAPI 3.0.1 specification (YAML)
+**Version**: 1.0.213
+**Purpose**: Schema definitions for station data, timetable structures, and API validation
+
+#### Key Schema Components:
+
+1. **Station Data (`station`)**:
+   - EVA station numbers (7-digit format)
+   - Station names and metadata
+   - Location coordinates and identifiers
+
+2. **Timetable Structures (`timetable`, `timetableStop`)**:
+   - Connection information
+   - Event timing and status
+   - Platform and track details
+
+3. **Validation Schemas**:
+   - `connectionStatus`: Connection state validation (waiting, transition, alternative)
+   - `eventStatus`: Departure/arrival event states
+   - `delaySource`: Delay information sources
+
+#### Masterdata Functions:
+
+- **`load_timetable_masterdata()`**: Loads the complete OpenAPI specification
+- **`get_station_schema()`**: Extracts schema definitions for validation
+- **`validate_eva_number()`**: Validates EVA station numbers (1000000-9999999)
+
+#### Error Handling:
+- Graceful degradation when masterdata is unavailable
+- YAML parsing error recovery
+- Schema validation with fallback to basic validation
+
+#### Integration Benefits:
+- **Data Validation**: Ensures station data meets Deutsche Bahn standards
+- **Schema Compliance**: API response validation against official schemas
+- **Future-Proofing**: Ready for enhanced validation and station lookup features
+- **Documentation**: Self-documenting API structures and formats
 
 ## Deployment Architecture
 

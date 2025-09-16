@@ -6,6 +6,40 @@ This document details the unofficial Deutsche Bahn API endpoints that Better-Bah
 
 ⚠️ **Important**: These are unofficial APIs that could change without notice. The endpoints are not officially supported by Deutsche Bahn.
 
+## Static Masterdata
+
+### Timetables API Schema (v1.0.213)
+
+Better-Bahn includes static masterdata from the official Deutsche Bahn Timetables API specification for data validation and schema compliance.
+
+**Source**: `data/Timetables-1.0.213.yaml`  
+**Format**: OpenAPI 3.0.1 specification  
+**Official API Base**: `https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1`
+
+#### Schema Coverage:
+
+1. **Station Information**:
+   - EVA station numbers (European station codes)
+   - Station names and location data
+   - Platform and facility information
+
+2. **Timetable Data Structures**:
+   - Connection details and timing
+   - Event status and delay information
+   - Message and disruption formats
+
+3. **Validation Rules**:
+   - EVA number format: 7-digit integers (1000000-9999999)
+   - Connection status types: waiting, transition, alternative
+   - Event timing in `YYMMddHHmm` format
+
+#### Usage in Better-Bahn:
+
+- **Data Validation**: EVA station numbers validated against official format
+- **Schema Compliance**: API responses checked against official structures
+- **Error Handling**: Graceful fallback when validation fails
+- **Documentation**: Self-documenting API structures for development
+
 ## Base Configuration
 
 ### API Base URL
