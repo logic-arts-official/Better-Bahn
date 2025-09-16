@@ -3,8 +3,11 @@
 /// This file implements the core theme and design tokens from the 
 /// DB UX Design System v3.1.1 (latest stable version)
 /// https://design-system.deutschebahn.com/
+/// 
+/// Updated to use Flutter default fonts with Google Fonts Lato
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// DB Design System Color Tokens v3.1.1
 class DBColors {
@@ -43,124 +46,110 @@ class DBColors {
 }
 
 /// DB Design System Typography v3.1.1
-/// Based on DB Sans and DB Head font families
+/// Updated to use Google Fonts Lato instead of proprietary DB fonts
 class DBTextStyles {
-  static const String _fontFamily = 'DB Sans';
-  static const String _headingFontFamily = 'DB Head';
+  // Using Google Fonts Lato for all text styles
+  static TextStyle get _baseTextStyle => GoogleFonts.lato();
+  static TextStyle get _headingTextStyle => GoogleFonts.lato(fontWeight: FontWeight.w700);
   
-  // Display Styles (DB Head)
-  static const TextStyle displayLarge = TextStyle(
-    fontFamily: _headingFontFamily,
+  // Display Styles (Using Lato Bold for headlines)
+  static TextStyle get displayLarge => _headingTextStyle.copyWith(
     fontSize: 57,
     fontWeight: FontWeight.w700,
     height: 1.12,
     letterSpacing: -0.25,
   );
   
-  static const TextStyle displayMedium = TextStyle(
-    fontFamily: _headingFontFamily,
+  static TextStyle get displayMedium => _headingTextStyle.copyWith(
     fontSize: 45,
     fontWeight: FontWeight.w700,
     height: 1.16,
   );
   
-  static const TextStyle displaySmall = TextStyle(
-    fontFamily: _headingFontFamily,
+  static TextStyle get displaySmall => _headingTextStyle.copyWith(
     fontSize: 36,
     fontWeight: FontWeight.w700,
     height: 1.22,
   );
   
-  // Headline Styles (DB Head)
-  static const TextStyle headlineLarge = TextStyle(
-    fontFamily: _headingFontFamily,
+  // Headline Styles (Using Lato Bold)
+  static TextStyle get headlineLarge => _headingTextStyle.copyWith(
     fontSize: 32,
     fontWeight: FontWeight.w700,
     height: 1.25,
   );
   
-  static const TextStyle headlineMedium = TextStyle(
-    fontFamily: _headingFontFamily,
+  static TextStyle get headlineMedium => _headingTextStyle.copyWith(
     fontSize: 28,
     fontWeight: FontWeight.w700,
     height: 1.29,
   );
   
-  static const TextStyle headlineSmall = TextStyle(
-    fontFamily: _headingFontFamily,
+  static TextStyle get headlineSmall => _headingTextStyle.copyWith(
     fontSize: 24,
     fontWeight: FontWeight.w700,
     height: 1.33,
   );
   
-  // Title Styles (DB Sans)
-  static const TextStyle titleLarge = TextStyle(
-    fontFamily: _fontFamily,
+  // Title Styles (Using Lato SemiBold)
+  static TextStyle get titleLarge => _baseTextStyle.copyWith(
     fontSize: 22,
     fontWeight: FontWeight.w600,
     height: 1.27,
   );
   
-  static const TextStyle titleMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get titleMedium => _baseTextStyle.copyWith(
     fontSize: 16,
     fontWeight: FontWeight.w600,
     height: 1.50,
     letterSpacing: 0.15,
   );
   
-  static const TextStyle titleSmall = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get titleSmall => _baseTextStyle.copyWith(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.43,
     letterSpacing: 0.1,
   );
   
-  // Body Styles (DB Sans)
-  static const TextStyle bodyLarge = TextStyle(
-    fontFamily: _fontFamily,
+  // Body Styles (Using Lato Regular)
+  static TextStyle get bodyLarge => _baseTextStyle.copyWith(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 1.50,
     letterSpacing: 0.5,
   );
   
-  static const TextStyle bodyMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get bodyMedium => _baseTextStyle.copyWith(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 1.43,
     letterSpacing: 0.25,
   );
   
-  static const TextStyle bodySmall = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get bodySmall => _baseTextStyle.copyWith(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 1.33,
     letterSpacing: 0.4,
   );
   
-  // Label Styles (DB Sans)
-  static const TextStyle labelLarge = TextStyle(
-    fontFamily: _fontFamily,
+  // Label Styles (Using Lato SemiBold)
+  static TextStyle get labelLarge => _baseTextStyle.copyWith(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.43,
     letterSpacing: 0.1,
   );
   
-  static const TextStyle labelMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get labelMedium => _baseTextStyle.copyWith(
     fontSize: 12,
     fontWeight: FontWeight.w600,
     height: 1.33,
     letterSpacing: 0.5,
   );
   
-  static const TextStyle labelSmall = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get labelSmall => _baseTextStyle.copyWith(
     fontSize: 11,
     fontWeight: FontWeight.w600,
     height: 1.45,
@@ -221,9 +210,9 @@ class DBBorderRadius {
 
 /// Main DB Theme Configuration for Material 3
 class DBTheme {
-  static ThemeData lightTheme = ThemeData(
+  static ThemeData get lightTheme => ThemeData(
     useMaterial3: true,
-    fontFamily: 'DB Sans',
+    textTheme: GoogleFonts.latoTextTheme(),
     
     // Color Scheme
     colorScheme: const ColorScheme.light(
@@ -259,8 +248,8 @@ class DBTheme {
       inversePrimary: DBColors.dbRedLight,
     ),
     
-    // Typography using DB Design System styles
-    textTheme: const TextTheme(
+    // Typography using DB Design System styles with Google Fonts Lato
+    textTheme: TextTheme(
       displayLarge: DBTextStyles.displayLarge,
       displayMedium: DBTextStyles.displayMedium,
       displaySmall: DBTextStyles.displaySmall,
@@ -283,13 +272,12 @@ class DBTheme {
     ),
     
     // App Bar Theme
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: DBColors.dbRed,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontFamily: 'DB Head',
+      titleTextStyle: GoogleFonts.lato(
         fontSize: 22,
         fontWeight: FontWeight.w700,
         color: Colors.white,
@@ -408,9 +396,9 @@ class DBTheme {
     ),
   );
   
-  static ThemeData darkTheme = ThemeData(
+  static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
-    fontFamily: 'DB Sans',
+    textTheme: GoogleFonts.latoTextTheme(ThemeData.dark().textTheme),
     
     // Dark Color Scheme
     colorScheme: const ColorScheme.dark(
@@ -446,8 +434,8 @@ class DBTheme {
       inversePrimary: DBColors.dbRed,
     ),
     
-    // Same typography as light theme
-    textTheme: const TextTheme(
+    // Same typography as light theme with Google Fonts Lato
+    textTheme: TextTheme(
       displayLarge: DBTextStyles.displayLarge,
       displayMedium: DBTextStyles.displayMedium,
       displaySmall: DBTextStyles.displaySmall,
@@ -470,13 +458,12 @@ class DBTheme {
     ),
     
     // Dark theme app bar
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: DBColors.dbBackgroundDark,
       foregroundColor: DBColors.dbGray100,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontFamily: 'DB Head',
+      titleTextStyle: GoogleFonts.lato(
         fontSize: 22,
         fontWeight: FontWeight.w700,
         color: DBColors.dbGray100,
