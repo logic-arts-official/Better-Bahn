@@ -74,14 +74,31 @@ flutter run
 ## Development Workflow
 
 ### Branch Management
+
+#### Repository Branches
+- **`main`**: Production branch for stable releases
+- **`dev`**: Development branch for new masterdata and API integration features
+
+#### Development Workflow
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally
-3. **Create** a feature branch: `git checkout -b feature/your-feature-name`
-4. **Develop** your changes
-5. **Test** thoroughly
-6. **Commit** with clear messages
-7. **Push** to your fork
-8. **Create** a Pull Request
+3. **Choose base branch**: 
+   - Use `main` for bug fixes and general improvements
+   - Use `dev` for masterdata updates, API changes, and experimental features
+4. **Create** a feature branch: `git checkout -b feature/your-feature-name`
+5. **Develop** your changes
+6. **Test** thoroughly
+7. **Commit** with clear messages
+8. **Push** to your fork
+9. **Create** a Pull Request targeting the appropriate base branch
+
+#### Dev Branch Purpose
+The `dev` branch serves as the integration point for:
+- **Masterdata updates**: Changes to station data, pricing structures, or Deutsche Bahn data formats
+- **API integration improvements**: Updates to Deutsche Bahn API interactions, new endpoints, or request handling
+- **Experimental features**: New functionality that requires extensive testing before production release
+
+This branch allows for collaborative development and easier review of complex changes before they're merged into the stable `main` branch.
 
 ### Coding Standards
 
