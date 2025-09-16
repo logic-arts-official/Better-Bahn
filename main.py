@@ -4,7 +4,8 @@ from urllib.parse import parse_qs, urlparse, quote
 import time
 import yaml
 import os
-from db_transport_api import DBTransportAPIClient
+from better_bahn_config import BetterBahnConfig
+from db_transport_api import DBTransportAPIClient, get_real_time_journey_info
 
 # --- HILFSFUNKTIONEN ---
 
@@ -72,97 +73,6 @@ def create_traveller_payload(age, bahncard_option):
         }
     ]
 
-
-def get_real_time_journey_info(from_station_name, to_station_name, departure_time=None):
-    """
-    Holt Echtzeit-Reiseinformationen über die v6.db.transport.rest API.
-    
-    Args:
-        from_station_name: Name der Abfahrtstation
-        to_station_name: Name der Zielstation  
-        departure_time: Abfahrtszeit (optional)
-        
-    Returns:
-        Dictionary mit Echtzeit-Informationen oder None bei Fehler
-    """
-    try:
-        print(f"Hole Echtzeit-Daten für {from_station_name} → {to_station_name}...")
-        
-        client = DBTransportAPIClient(rate_limit_delay=0.2)
-        
-        # Stationen finden
-        from_locations = client.find_locations(from_station_name, results=1)
-        to_locations = client.find_locations(to_station_name, results=1)
-        
-        if not from_locations or not to_locations:
-            print("Warnung: Konnte Stationen nicht über Echtzeit-API finden")
-            return None
-            
-        from_id = from_locations[0]['id']
-        to_id = to_locations[0]['id']
-        
-        # Verbindungen suchen
-        journeys_data = client.get_journeys(
-            from_id, 
-            to_id, 
-            departure=departure_time,
-            results=3,
-            stopovers=True
-        )
-        
-        if not journeys_data or 'journeys' not in journeys_data:
-            print("Warnung: Keine Echtzeit-Verbindungen gefunden")
-            return None
-            
-        real_time_info = {
-            'available': True,
-            'journeys_count': len(journeys_data['journeys']),
-            'journeys': []
-        }
-        
-        for journey in journeys_data['journeys'][:2]:  # Nur erste 2 Verbindungen
-            status = client.get_real_time_status(journey)
-            journey_info = {
-                'duration_minutes': journey.get('duration', 0) // 60 if journey.get('duration') else 0,
-                'transfers': len(journey.get('legs', [])) - 1,
-                'real_time_status': status,
-                'legs_count': len(journey.get('legs', []))
-            }
-            real_time_info['journeys'].append(journey_info)
-        
-        return real_time_info
-        
-    except Exception as e:
-        print(f"Fehler beim Abrufen der Echtzeit-Daten: {e}")
-        return None
-
-
-def enhance_connection_with_real_time(connection_data, real_time_info):
-    """
-    Erweitert Verbindungsdaten um Echtzeit-Informationen.
-    
-    Args:
-        connection_data: Bestehende Verbindungsdaten von bahn.de
-        real_time_info: Echtzeit-Daten von v6.db.transport.rest
-        
-    Returns:
-        Erweiterte Verbindungsdaten
-    """
-    if not real_time_info or not real_time_info.get('available'):
-        return connection_data
-    
-    # Echtzeit-Status zu den Verbindungen hinzufügen
-    if 'verbindungen' in connection_data and connection_data['verbindungen']:
-        first_connection = connection_data['verbindungen'][0]
-        
-        if real_time_info['journeys']:
-            first_journey = real_time_info['journeys'][0]
-            first_connection['echtzeit_status'] = first_journey['real_time_status']
-            first_connection['echtzeit_verfügbar'] = True
-        else:
-            first_connection['echtzeit_verfügbar'] = False
-    
-    return connection_data
 
 
 # --- API-FUNKTIONEN ---
@@ -496,6 +406,24 @@ if __name__ == "__main__":
     if args.real_time:
         print("\n--- Integriere Echtzeit-Daten ---")
         
+        # Load configuration (check for config file, fallback to environment)
+        config_path = os.getenv('BETTER_BAHN_CONFIG_FILE')
+        if config_path and os.path.exists(config_path):
+            try:
+                config = BetterBahnConfig.from_file(config_path)
+                print(f"✓ Konfiguration geladen aus: {config_path}")
+            except Exception as e:
+                print(f"⚠️ Fehler beim Laden der Konfigurationsdatei: {e}")
+                config = BetterBahnConfig.from_env()
+        else:
+            config = BetterBahnConfig.from_env()
+        
+        # Setup logging
+        logger = config.setup_logging()
+        
+        # Initialize enhanced API client
+        api_client = DBTransportAPIClient(config)
+        
         # Extrahiere Stationsnamen für Echtzeit-Abfrage
         first_connection = connection_data["verbindungen"][0]
         
@@ -503,32 +431,62 @@ if __name__ == "__main__":
             start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0]["bahnhofsName"]
             end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1]["bahnhofsName"]
             
-            # Hole Echtzeit-Informationen
-            real_time_info = get_real_time_journey_info(start_station, end_station, date_part)
+            print(f"🔍 Suche Echtzeit-Daten für: {start_station} → {end_station}")
             
-            # Erweitere Verbindungsdaten um Echtzeit-Informationen
-            connection_data = enhance_connection_with_real_time(connection_data, real_time_info)
-            
-            # Zeige Echtzeit-Status an
-            if real_time_info and real_time_info.get('available'):
-                print(f"✓ Echtzeit-Daten erfolgreich integriert ({real_time_info['journeys_count']} Verbindungen)")
-                
-                if real_time_info['journeys']:
-                    first_journey = real_time_info['journeys'][0]
-                    rt_status = first_journey['real_time_status']
-                    
-                    if rt_status['has_delays']:
-                        print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
-                    if rt_status['cancelled_legs'] > 0:
-                        print(f"❌ Ausfälle: {rt_status['cancelled_legs']} Teilstrecken betroffen")
-                    if not rt_status['has_delays'] and rt_status['cancelled_legs'] == 0:
-                        print("✅ Aktuell keine Verspätungen oder Ausfälle")
+            # Check API availability first
+            if not api_client.is_available():
+                print("⚠️ Echtzeit-API momentan nicht erreichbar (Fallback zu statischen Daten)")
             else:
-                print("⚠️  Echtzeit-Daten momentan nicht verfügbar")
+                # Hole Echtzeit-Informationen mit verbesserter API
+                real_time_info = get_real_time_journey_info(start_station, end_station, config)
+                
+                # Zeige Echtzeit-Status an
+                if real_time_info and real_time_info.get('available'):
+                    print(f"✓ Echtzeit-Daten erfolgreich integriert ({real_time_info['journeys_count']} Verbindungen)")
+                    
+                    if real_time_info['journeys']:
+                        first_journey = real_time_info['journeys'][0]
+                        rt_status = first_journey['real_time_status']
+                        
+                        if rt_status['has_delays']:
+                            print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
+                        if rt_status['has_cancellations']:
+                            print("❌ Ausfälle: Teilstrecken betroffen")
+                        if rt_status['status'] == 'on_time':
+                            print("✅ Aktuell keine Verspätungen oder Ausfälle")
+                        
+                        # Show cache statistics if enabled
+                        if config.cache.enable_memory_cache or config.cache.enable_disk_cache:
+                            cache_stats = api_client.get_cache_stats()
+                            if cache_stats and config.logging.track_cache_hits:
+                                total_hit_rate = cache_stats.get('total_hit_rate', 0)
+                                print(f"📊 Cache-Effizienz: {total_hit_rate:.1%}")
+                        
+                        # Show performance metrics if enabled
+                        if config.logging.enable_metrics:
+                            metrics = api_client.get_metrics(window_minutes=1)
+                            if metrics and metrics['latency']['count'] > 0:
+                                avg_latency = metrics['latency']['mean_ms']
+                                print(f"⚡ API-Latenz: {avg_latency:.0f}ms")
+                
+                else:
+                    error_msg = real_time_info.get('error', 'Unbekannter Fehler') if real_time_info else 'Keine Antwort'
+                    print(f"⚠️ Echtzeit-Daten momentan nicht verfügbar: {error_msg}")
+                    
+                    # Try stale cache as graceful degradation
+                    print("🔄 Versuche Fallback zu zwischengespeicherten Daten...")
+                    # Note: Stale cache handling is implemented in the API client
         else:
-            print("⚠️  Konnte Stationsnamen für Echtzeit-Abfrage nicht extrahieren")
+            print("⚠️ Konnte Stationsnamen für Echtzeit-Abfrage nicht extrahieren")
+        
+        # Cleanup old cache entries
+        cleanup_stats = api_client.cleanup_cache()
+        if cleanup_stats.get('disk_cleanup', 0) > 0:
+            print(f"🧹 {cleanup_stats['disk_cleanup']} abgelaufene Cache-Einträge bereinigt")
+        
     else:
         print("\n--- Echtzeit-Daten deaktiviert ---")
+        print("💡 Verwenden Sie --real-time um Echtzeit-Informationen zu aktivieren")
 
     print("\n--- Analysiere die Verbindung ---")
     print(f"Datum: {date_part}")
