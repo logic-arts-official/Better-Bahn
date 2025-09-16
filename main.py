@@ -1,10 +1,14 @@
-Fertig. Konflikte entfernt. Läuft mit deinem bereitgestellten `db_transport_api` (ohne `BetterBahnConfig`-Abhängigkeiten für den Client) und nutzt das bereits importierte `get_real_time_journey_info`.
+Hier ist die bereinigte, zusammengeführte Datei. Konfliktmarker entfernt. Nutzt das importierte `get_real_time_journey_info` und behält die erweiterten Masterdata-Funktionen.
 
 ```python
 import argparse
 import json
 import os
+import re
 import time
+import unicodedata
+import hashlib
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse, quote
 
 import requests
@@ -12,6 +16,13 @@ import yaml
 
 from db_transport_api import DBTransportAPIClient, get_real_time_journey_info
 from departure_board import DepartureBoardService
+
+try:
+    import jsonschema
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
+    print("⚠️ Warnung: jsonschema nicht verfügbar. Schema-Validierung ist deaktiviert.")
 
 
 # --- HILFSFUNKTIONEN ---
@@ -79,6 +90,221 @@ def validate_eva_number(eva_no):
         return False
 
 
+# --- ERWEITERTE MASTERDATA-FUNKTIONEN ---
+
+def load_masterdata_schema():
+    """Lädt das JSON-Schema für Masterdata-Validierung."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    schema_path = os.path.join(current_dir, "data", "masterdata_schema.json")
+    try:
+        with open(schema_path, "r", encoding="utf-8") as file:
+            schema = json.load(file)
+            print(f"✓ Masterdata-Schema geladen: {schema.get('title', 'Unbekannt')}")
+            return schema
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Masterdata-Schema nicht gefunden unter {schema_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Fehler beim Laden des Masterdata-Schemas: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden des Schemas: {e}")
+        return None
+
+
+def load_timetables_version():
+    """Lädt die Versionsinformationen der Timetables."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    version_path = os.path.join(current_dir, "data", "timetables.version.json")
+    try:
+        with open(version_path, "r", encoding="utf-8") as file:
+            version_info = json.load(file)
+            print(f"✓ Timetables-Version geladen: {version_info.get('version', 'Unbekannt')}")
+            return version_info
+    except FileNotFoundError:
+        print(f"⚠️ Warnung: Versionsinformationen nicht gefunden unter {version_path}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Fehler beim Laden der Versionsinformationen: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ Unerwarteter Fehler beim Laden der Versionsinformationen: {e}")
+        return None
+
+
+def normalize_station_name(name):
+    """Normalisiert Stationsnamen für Suchindex."""
+    if not name:
+        return ""
+    normalized = unicodedata.normalize("NFD", name)
+    no_diacritics = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    casefolded = no_diacritics.casefold()
+    clean = re.sub(r"\s+", " ", casefolded).strip()
+    return clean
+
+
+def validate_station_data(station_data):
+    """Validiert Stationsdaten gegen das Masterdata-Schema."""
+    if not JSONSCHEMA_AVAILABLE:
+        errors = []
+        if not station_data.get("id"):
+            errors.append("Station ID ist erforderlich")
+        if not station_data.get("name"):
+            errors.append("Station Name ist erforderlich")
+        return len(errors) == 0, errors
+
+    schema = load_masterdata_schema()
+    if not schema:
+        return False, ["Schema konnte nicht geladen werden"]
+
+    try:
+        station_schema = schema.get("$defs", {}).get("station", {})
+        if not station_schema:
+            return False, ["Station-Schema nicht im Masterdata-Schema gefunden"]
+        jsonschema.validate(station_data, station_schema)
+
+        errors = []
+        if "eva" in station_data and not validate_eva_number(station_data["eva"]):
+            errors.append(f"Ungültige EVA-Nummer: {station_data['eva']}")
+        lat = station_data.get("lat")
+        lon = station_data.get("lon")
+        if lat is not None and lon is not None:
+            if not (47 <= lat <= 55):
+                errors.append(f"Latitude außerhalb Deutschland-Bereich: {lat}")
+            if not (6 <= lon <= 15):
+                errors.append(f"Longitude außerhalb Deutschland-Bereich: {lon}")
+        return len(errors) == 0, errors
+    except jsonschema.ValidationError as e:
+        return False, [f"Schema-Validierungsfehler: {e.message}"]
+    except Exception as e:
+        return False, [f"Unerwarteter Validierungsfehler: {str(e)}"]
+
+
+def validate_service_data(service_data):
+    """Validiert Service/Trip-Daten gegen das Masterdata-Schema."""
+    if not JSONSCHEMA_AVAILABLE:
+        errors = []
+        if not service_data.get("id"):
+            errors.append("Service ID ist erforderlich")
+        if not service_data.get("product"):
+            errors.append("Service Product ist erforderlich")
+        if not service_data.get("stops") or len(service_data["stops"]) < 2:
+            errors.append("Service muss mindestens 2 Stops haben")
+        return len(errors) == 0, errors
+
+    schema = load_masterdata_schema()
+    if not schema:
+        return False, ["Schema konnte nicht geladen werden"]
+
+    try:
+        service_schema = schema.get("$defs", {}).get("service", {})
+        if not service_schema:
+            return False, ["Service-Schema nicht im Masterdata-Schema gefunden"]
+
+        resolver = jsonschema.RefResolver(base_uri=schema.get("$id", ""), referrer=schema)
+        validator = jsonschema.Draft202012Validator(service_schema, resolver=resolver)
+        validation_errors = [f"Schema-Validierungsfehler: {e.message}" for e in validator.iter_errors(service_data)]
+        if validation_errors:
+            return False, validation_errors
+
+        errors = []
+        stops = service_data.get("stops", [])
+        for i, stop in enumerate(stops):
+            if stop.get("sequence") != i:
+                errors.append(f"Stop-Sequenz stimmt nicht überein: erwartet {i}, gefunden {stop.get('sequence')}")
+        for stop in stops:
+            arrival = stop.get("arrival_planned")
+            departure = stop.get("departure_planned")
+            if arrival and departure:
+                try:
+                    at = datetime.fromisoformat(arrival.replace("Z", "+00:00"))
+                    dt = datetime.fromisoformat(departure.replace("Z", "+00:00"))
+                    if dt < at:
+                        errors.append(f"Abfahrt vor Ankunft in Stop {stop.get('sequence', '?')}")
+                except ValueError:
+                    errors.append(f"Ungültiges Zeitformat in Stop {stop.get('sequence', '?')}")
+        return len(errors) == 0, errors
+    except Exception as e:
+        return False, [f"Unerwarteter Validierungsfehler: {str(e)}"]
+
+
+def compute_file_hash(file_path):
+    """Berechnet SHA256-Hash einer Datei."""
+    try:
+        h = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception as e:
+        print(f"Fehler beim Hash-Berechnen für {file_path}: {e}")
+        return None
+
+
+def update_timetables_version(stats=None):
+    """Aktualisiert die timetables.version.json."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    version_path = os.path.join(current_dir, "data", "timetables.version.json")
+    timetables_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+    file_hash = compute_file_hash(timetables_path)
+    now = datetime.utcnow().isoformat() + "Z"
+    version_info = load_timetables_version() or {}
+    version_info.update(
+        {
+            "file_sha256": file_hash or "hash_computation_failed",
+            "generated_at": now,
+            "statistics": stats or version_info.get("statistics", {"total_stations": 0, "total_services": 0, "last_updated": now}),
+        }
+    )
+    try:
+        with open(version_path, "w", encoding="utf-8") as f:
+            json.dump(version_info, f, indent=2, ensure_ascii=False)
+        print(f"✓ Versionsinformationen aktualisiert: {version_path}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Fehler beim Aktualisieren der Versionsinformationen: {e}")
+        return False
+
+
+def precompute_adjacency_data(stations, services):
+    """Vorberechnung von Adjazenz-/Routensegmenten für Journey Planning."""
+    adjacency = {}
+    route_segments = []
+    print("Berechne Adjazenz-Daten...")
+    for service in services:
+        stops = service.get("stops", [])
+        service_id = service.get("id", "unknown")
+        for i in range(len(stops) - 1):
+            from_stop = stops[i]
+            to_stop = stops[i + 1]
+            fs = from_stop.get("station_id")
+            ts = to_stop.get("station_id")
+            if fs and ts:
+                adjacency.setdefault(fs, set()).add(ts)
+                route_segments.append(
+                    {
+                        "from_station": fs,
+                        "to_station": ts,
+                        "service_id": service_id,
+                        "from_sequence": from_stop.get("sequence"),
+                        "to_sequence": to_stop.get("sequence"),
+                        "departure_planned": from_stop.get("departure_planned"),
+                        "arrival_planned": to_stop.get("arrival_planned"),
+                    }
+                )
+    adjacency_lists = {k: list(v) for k, v in adjacency.items()}
+    routing_data = {
+        "adjacency": adjacency_lists,
+        "route_segments": route_segments,
+        "computed_at": datetime.utcnow().isoformat() + "Z",
+        "total_stations": len(adjacency_lists),
+        "total_segments": len(route_segments),
+    }
+    print(f"✓ Adjazenz-Daten berechnet: {len(adjacency_lists)} Stationen, {len(route_segments)} Segmente")
+    return routing_data
+
+
 def create_traveller_payload(age, bahncard_option):
     """Erstellt das 'reisende' JSON-Objekt basierend auf der BahnCard-Auswahl."""
     ermaessigung = {"art": "KEINE_ERMAESSIGUNG", "klasse": "KLASSENLOS"}
@@ -87,9 +313,22 @@ def create_traveller_payload(age, bahncard_option):
         bc_art = f"BAHNCARD{bc_typ_str[2:]}"
         k_art = f"KLASSE_{klasse_str}"
         ermaessigung = {"art": bc_art, "klasse": k_art}
-    return [
-        {"typ": "ERWACHSENER", "ermaessigungen": [ermaessigung], "anzahl": 1, "alter": []}
-    ]
+    return [{"typ": "ERWACHSENER", "ermaessigungen": [ermaessigung], "anzahl": 1, "alter": []}]
+
+
+def enhance_connection_with_real_time(connection_data, real_time_info):
+    """Erweitert Verbindungsdaten um Echtzeit-Informationen."""
+    if not real_time_info or not real_time_info.get("available"):
+        return connection_data
+    if "verbindungen" in connection_data and connection_data["verbindungen"]:
+        first_connection = connection_data["verbindungen"][0]
+        if real_time_info["journeys"]:
+            first_journey = real_time_info["journeys"][0]
+            first_connection["echtzeit_status"] = first_journey["real_time_status"]
+            first_connection["echtzeit_verfügbar"] = True
+        else:
+            first_connection["echtzeit_verfügbar"] = False
+    return connection_data
 
 
 # --- API-FUNKTIONEN ---
@@ -107,7 +346,6 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
         if not recon_string:
             print("Fehler: Konnte keinen 'hinfahrtRecon' aus der vbid-Antwort extrahieren.")
             return None
-
         recon_url = "https://www.bahn.de/web/api/angebote/recon"
         payload = {
             "klasse": "KLASSE_2",
@@ -125,14 +363,7 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
         return None
 
 
-def get_connection_details(
-    from_station_id,
-    to_station_id,
-    date,
-    departure_time,
-    traveller_payload,
-    deutschland_ticket,
-):
+def get_connection_details(from_station_id, to_station_id, date, departure_time, traveller_payload, deutschland_ticket):
     """Ruft Verbindungsdetails ab (für lange URLs oder Teilstrecken)."""
     url = "https://www.bahn.de/web/api/angebote/fahrplan"
     payload = {
@@ -141,19 +372,12 @@ def get_connection_details(
         "ankunftsHalt": to_station_id,
         "ankunftSuche": "ABFAHRT",
         "klasse": "KLASSE_2",
-        "produktgattungen": [
-            "ICE", "EC_IC", "IR", "REGIONAL", "SBAHN", "BUS",
-            "SCHIFF", "UBAHN", "TRAM", "ANRUFPFLICHTIG",
-        ],
+        "produktgattungen": ["ICE", "EC_IC", "IR", "REGIONAL", "SBAHN", "BUS", "SCHIFF", "UBAHN", "TRAM", "ANRUFPFLICHTIG"],
         "reisende": traveller_payload,
         "schnelleVerbindungen": True,
         "deutschlandTicketVorhanden": deutschland_ticket,
     }
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json",
-        "Content-Type": "application/json; charset=UTF-8",
-    }
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json", "Content-Type": "application/json; charset=UTF-8"}
     try:
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
@@ -168,10 +392,7 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
     departure_time_str = from_stop["departure_time"]
     if not departure_time_str:
         return None
-
-    connections = get_connection_details(
-        from_stop["id"], to_stop["id"], date, departure_time_str, traveller_payload, deutschland_ticket
-    )
+    connections = get_connection_details(from_stop["id"], to_stop["id"], date, departure_time_str, traveller_payload, deutschland_ticket)
     if connections and connections.get("verbindungen"):
         first_connection = connections["verbindungen"][0]
         price = first_connection.get("angebotsPreis", {}).get("betrag")
@@ -180,15 +401,13 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
             .get("halte", [{}])[0]
             .get("abfahrtsZeitpunkt")
         )
-
         is_covered_by_d_ticket = False
         if deutschland_ticket:
             for section in first_connection.get("verbindungsAbschnitte", []):
-                attributes = section.get("verkehrsmittel", {}).get("zugattribute", [])
-                if any(attr.get("key") == "9G" for attr in attributes):
+                attrs = section.get("verkehrsmittel", {}).get("zugattribute", [])
+                if any(attr.get("key") == "9G" for attr in attrs):
                     is_covered_by_d_ticket = True
                     break
-
         if is_covered_by_d_ticket:
             print(" -> Deutschland-Ticket gültig! Preis wird auf 0.00 € gesetzt.")
             price = 0.0
@@ -197,7 +416,6 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
         else:
             print(" -> Kein Preis für dieses Segment verfügbar.")
             return None
-
         if price is not None and departure_iso:
             return {
                 "price": price,
@@ -207,7 +425,6 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
                 "end_id": to_stop["id"],
                 "departure_iso": departure_iso,
             }
-
     print(" -> Keine Verbindungsdaten erhalten.")
     return None
 
@@ -215,15 +432,13 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
 def generate_booking_link(segment, bahncard_option, has_d_ticket):
     """Erstellt einen stabilen, kontextreichen Buchungslink (Deep Link)."""
     base_url = "https://www.bahn.de/buchung/fahrplan/suche"
-
     so = quote(segment["start_name"])
     zo = quote(segment["end_name"])
     soid = quote(segment["start_id"])
     zoid = quote(segment["end_id"])
-    hd = quote(segment["departure_iso"].split(".")[0])  # exakte Abfahrtszeit
+    hd = quote(segment["departure_iso"].split(".")[0])
     dltv = str(has_d_ticket).lower()
     r_param = ""
-
     if bahncard_option:
         bc_map = {
             "BC25_2": "13:25:KLASSE_2:1",
@@ -234,7 +449,6 @@ def generate_booking_link(segment, bahncard_option, has_d_ticket):
         r_code = bc_map.get(bahncard_option)
         if r_code:
             r_param = f"&r={quote(r_code)}"
-
     return f"{base_url}#sts=true&so={so}&zo={zo}&soid={soid}&zoid={zoid}&hd={hd}&dltv={dltv}{r_param}"
 
 
@@ -245,7 +459,6 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
     n = len(stops)
     segments_data = {}
     print("\n--- Preise und Daten für alle möglichen Teilstrecken werden abgerufen ---")
-
     for i in range(n):
         for j in range(i + 1, n):
             from_stop, to_stop = stops[i], stops[j]
@@ -253,11 +466,9 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
             data = get_segment_data(from_stop, to_stop, date, traveller_payload, args.deutschland_ticket)
             if data:
                 segments_data[(i, j)] = data
-
     dp = [float("inf")] * n
     dp[0] = 0
     path_reconstruction = [-1] * n
-
     for i in range(1, n):
         for j in range(i):
             if (j, i) in segments_data:
@@ -265,20 +476,16 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
                 if cost < dp[i]:
                     dp[i] = cost
                     path_reconstruction[i] = j
-
     cheapest_split_price = dp[-1]
-
     print("\n" + "=" * 50)
     print("--- ERGEBNIS DER ANALYSE ---")
     print("=" * 50)
-
     if cheapest_split_price < direct_price and cheapest_split_price != float("inf"):
         savings = direct_price - cheapest_split_price
         print("\n🎉 Günstigere Split-Ticket-Option gefunden! 🎉")
         print(f"Direktpreis: {direct_price:.2f} €")
         print(f"Bester Split-Preis: {cheapest_split_price:.2f} €")
         print(f"💰 Ersparnis: {savings:.2f} € 💰")
-
         path = []
         current = n - 1
         while current > 0 and path_reconstruction[current] != -1:
@@ -286,7 +493,6 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
             path.append(segments_data.get((prev, current)))
             current = prev
         path.reverse()
-
         print("\nEmpfohlene Tickets zum Buchen:")
         for idx, segment in enumerate(path, 1):
             if segment:
@@ -337,7 +543,6 @@ if __name__ == "__main__":
 
         print("🚂 Better-Bahn Abfahrtstafel-Modus")
         print("=" * 50)
-
         departure_service = DepartureBoardService()
 
         if args.demo:
@@ -353,7 +558,6 @@ if __name__ == "__main__":
                     raise SystemExit(1)
                 station_id = station_info['id']
                 print(f"✓ Station gefunden: {station_info['name']} (EVA: {station_id})")
-
             print(f"\n📡 Lade Abfahrtsdaten für Station {station_id}...")
             board = departure_service.create_departure_board(station_id=station_id)
 
@@ -398,9 +602,7 @@ if __name__ == "__main__":
             raise SystemExit(1)
         from_station_id, to_station_id, datetime_str = (params["soid"][0], params["zoid"][0], params["hd"][0])
         date_part, time_part = datetime_str.split("T")
-        connection_data = get_connection_details(
-            from_station_id, to_station_id, date_part, time_part, traveller_payload, args.deutschland_ticket
-        )
+        connection_data = get_connection_details(from_station_id, to_station_id, date_part, time_part, traveller_payload, args.deutschland_ticket)
 
     if not connection_data or not connection_data.get("verbindungen"):
         print("Konnte keine Verbindungsdetails für den angegebenen Link abrufen.")
@@ -410,25 +612,21 @@ if __name__ == "__main__":
     if args.real_time:
         print("\n--- Integriere Echtzeit-Daten ---")
         first_connection = connection_data["verbindungen"][0]
-
         if "verbindungsAbschnitte" in first_connection and first_connection["verbindungsAbschnitte"]:
             start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0]["bahnhofsName"]
             end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1]["bahnhofsName"]
-
             print(f"🔍 Suche Echtzeit-Daten für: {start_station} → {end_station}")
-            # Nutzt das im Modul bereitgestellte resilient helper
             real_time_info = get_real_time_journey_info(start_station, end_station)
-
+            connection_data = enhance_connection_with_real_time(connection_data, real_time_info)
             if real_time_info and real_time_info.get('available'):
                 print(f"✓ Echtzeit-Daten integriert ({real_time_info['journeys_count']} Verbindungen)")
                 if real_time_info['journeys']:
-                    first_journey = real_time_info['journeys'][0]
-                    rt_status = first_journey['real_time_status']
+                    rt_status = real_time_info['journeys'][0]['real_time_status']
                     if rt_status['has_delays']:
                         print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
-                    if rt_status.get('has_cancellations'):
+                    if rt_status.get('has_cancellations') or rt_status.get('cancelled_legs', 0) > 0:
                         print("❌ Ausfälle: Teilstrecken betroffen")
-                    if rt_status.get('has_delays') is False and not rt_status.get('has_cancellations'):
+                    if not rt_status['has_delays'] and not rt_status.get('has_cancellations', False) and rt_status.get('cancelled_legs', 0) == 0:
                         print("✅ Aktuell keine Verspätungen oder Ausfälle")
             else:
                 error_msg = real_time_info.get('error', 'Unbekannter Fehler') if real_time_info else 'Keine Antwort'
@@ -450,11 +648,9 @@ if __name__ == "__main__":
 
     first_connection = connection_data["verbindungen"][0]
     direct_price = first_connection.get("angebotsPreis", {}).get("betrag")
-
     if direct_price is None:
         print("Konnte den Direktpreis nicht ermitteln. Analyse nicht möglich.")
         raise SystemExit(1)
-
     print(f"Direktpreis gefunden: {direct_price:.2f} €")
 
     all_stops = []
