@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from db_transport_api import DBTransportAPIClient
-from main import get_real_time_journey_info, enhance_connection_with_real_time
+from main import get_real_time_journey_info
 
 
 def demo_real_time_features():
@@ -61,7 +61,7 @@ def demo_real_time_features():
                 if status['cancelled_legs'] > 0:
                     print(f"         ❌ Cancellations: {status['cancelled_legs']} legs affected")
                 if not status['has_delays'] and status['cancelled_legs'] == 0:
-                    print(f"         ✅ On time, no delays or cancellations")
+                    print("         ✅ On time, no delays or cancellations")
         else:
             print("   ⚠️  No journey data available")
             
@@ -84,7 +84,7 @@ def demo_real_time_features():
             if real_time_info['journeys']:
                 first_journey = real_time_info['journeys'][0]
                 rt_status = first_journey['real_time_status']
-                print(f"      First journey status:")
+                print("      First journey status:")
                 print(f"         Duration: {first_journey['duration_minutes']} minutes")
                 print(f"         Transfers: {first_journey['transfers']}")
                 print(f"         Delays: {rt_status['has_delays']} ({rt_status['total_delay_minutes']}min)")

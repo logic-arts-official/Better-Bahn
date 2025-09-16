@@ -9,26 +9,56 @@ from db_transport_api import DBTransportAPIClient
 # --- HILFSFUNKTIONEN ---
 
 def load_timetable_masterdata():
-    """Lädt die statische Fahrplan-Masterdaten aus der YAML-Datei."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
-
+    """Lädt die statische Fahrplan-Masterdaten mit verbesserter Validierung und Typisierung."""
     try:
-        with open(yaml_path, "r", encoding="utf-8") as file:
-            masterdata = yaml.safe_load(file)
-            print(
-                f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
-            )
-            return masterdata
-    except FileNotFoundError:
-        print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
-        return None
-    except yaml.YAMLError as e:
-        print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
-        return None
+        from masterdata_loader import load_timetable_masterdata as load_masterdata_typed
+        # Use the new strongly typed loader
+        masterdata_obj = load_masterdata_typed()
+        return masterdata_obj.raw_data
+    except ImportError:
+        # Fallback to original implementation if new modules not available
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as file:
+                masterdata = yaml.safe_load(file)
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
+                return masterdata
+        except FileNotFoundError:
+            print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+            return None
+        except yaml.YAMLError as e:
+            print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+            return None
+        except Exception as e:
+            print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+            return None
     except Exception as e:
-        print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
-        return None
+        print(f"⚠️ Fehler beim Laden der typisierter Masterdaten: {e}")
+        print("Fallback auf ursprüngliche Implementierung...")
+        # Fallback to original implementation
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.join(current_dir, "data", "Timetables-1.0.213.yaml")
+
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as file:
+                masterdata = yaml.safe_load(file)
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
+                return masterdata
+        except FileNotFoundError:
+            print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
+            return None
+        except yaml.YAMLError as e:
+            print(f"⚠️ Fehler beim Laden der Fahrplan-Masterdaten: {e}")
+            return None
+        except Exception as e:
+            print(f"⚠️ Unerwarteter Fehler beim Laden der Masterdaten: {e}")
+            return None
 
 
 def get_station_schema():
