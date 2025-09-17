@@ -103,7 +103,7 @@ uv run python main.py --departure-board --station "Hamburg" --demo  # Test offli
 - **pip install uv**: ~4 seconds
 - **pip install ruff**: ~2 seconds  
 - **uv add pytest**: ~69ms (adding dependencies to uv project)
-- **flutter pub get**: ~5.5 seconds (first time, 2-5 minutes on slower systems) (NEVER CANCEL - set timeout to 10+ minutes)
+- **flutter pub get**: typically 5-15 seconds on modern systems; may take 2-5 minutes on older hardware or slow networks (NEVER CANCEL - set timeout to 10+ minutes)
 - **flutter analyze**: ~12 seconds
 - **flutter build apk --debug**: ~4 minutes (debug build, faster than release)
 - **flutter build apk**: 10-15 minutes (release build, NEVER CANCEL - set timeout to 30+ minutes)
