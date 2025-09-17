@@ -23,6 +23,8 @@ Better-Bahn is a dual-platform application for finding cheaper split-ticket opti
 ### Essential Commands
 
 #### Python CLI Development
+
+> **Note:** The `uv run python main.py ...` command uses the explicit `python` prefix to ensure the script is run with the correct interpreter, especially in environments where `main.py` is not marked as executable or where `uv run main.py ...` may fail. If `uv run main.py ...` works in your environment, you may use the simpler form, but the explicit version is recommended for consistency.
 - **Help command**: `uv run python main.py --help`
 - **Test with example URL**: `uv run python main.py "https://www.bahn.de/buchung/start?vbid=9dd9db26-4ffc-411c-b79c-e82bf5338989" --age 30`
   - Expected: Network error in sandboxed environments, but command parsing works
