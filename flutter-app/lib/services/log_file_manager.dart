@@ -10,8 +10,11 @@ import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 
 // Platform-specific imports
-import 'dart:io' if (dart.library.html) 'dart:html' as platform_io;
-import 'package:path_provider/path_provider.dart' if (dart.library.html) 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+
+// Web support
+import 'dart:html' as html show document, AnchorElement;
 
 class LogFileManager {
   static const String _logFileName = 'better_bahn_logs.txt';
@@ -25,13 +28,13 @@ class LogFileManager {
     }
     
     try {
-      dynamic directory;
+      Directory directory;
       
-      if (platform_io.Platform.isAndroid) {
+      if (Platform.isAndroid) {
         // Use external storage directory for Android
         directory = await getExternalStorageDirectory() ?? 
                    await getApplicationDocumentsDirectory();
-      } else if (platform_io.Platform.isWindows) {
+      } else if (Platform.isWindows) {
         // Use Documents directory for Windows
         directory = await getApplicationDocumentsDirectory();
       } else {
@@ -153,18 +156,17 @@ class LogFileManager {
     if (!kIsWeb) return false;
     
     try {
-      // For web, we need to use the html library
+      // For web platforms, create a downloadable data URL
       final bytes = utf8.encode(content);
       final dataUrl = 'data:text/plain;charset=utf-8;base64,${base64.encode(bytes)}';
       
-      // Create download using URL
-      final anchor = platform_io.document.createElement('a');
-      anchor.setAttribute('href', dataUrl);
-      anchor.setAttribute('download', _logFileName);
+      // Use the browser's download mechanism
+      final anchor = document.createElement('a') as AnchorElement;
+      anchor.href = dataUrl;
+      anchor.download = _logFileName;
       anchor.style.display = 'none';
       
-      // Trigger download
-      platform_io.document.body?.append(anchor);
+      document.body?.append(anchor);
       anchor.click();
       anchor.remove();
       
