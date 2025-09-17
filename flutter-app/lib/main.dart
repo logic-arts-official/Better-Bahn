@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'design_system/db_theme.dart';
 import 'design_system/db_components.dart';
+import 'services/rate_limiter.dart';
 
 void main() {
   runApp(const SplitTicketApp());
@@ -47,7 +48,7 @@ class _HomePageState
   final TextEditingController
   _delayController =
       TextEditingController(
-        text: "500",
+        text: "0",
       );
   final ScrollController
   _scrollController =
@@ -488,8 +489,12 @@ class _HomePageState
     travellerPayload,
   ) async {
     _addLog("Löse VBID '$vbid' auf...");
+    
+    // Create cache key for this specific request
+    final cacheKey = 'vbid_${vbid}_${travellerPayload.toString()}';
+    
     try {
-      // Step 1: Get the 'recon' string from the vbid endpoint
+      // Step 1: Get the 'recon' string from the vbid endpoint with rate limiting
       final vbidUrl =
           "https://www.bahn.de/web/api/angebote/verbindung/$vbid";
       // Enhanced headers based on working browser requests - required for API access
@@ -505,9 +510,20 @@ class _HomePageState
         "Sec-Fetch-Dest": "empty",
       };
 
-      final response = await http.get(
-        Uri.parse(vbidUrl),
-        headers: headers,
+      final response = await globalRateLimiter.executeWithRetry<http.Response>(
+        () => http.get(
+          Uri.parse(vbidUrl),
+          headers: headers,
+        ),
+        cacheKey: '${cacheKey}_step1',
+        shouldRetry: (exception) {
+          // Retry on rate limiting and network errors
+          final errorStr = exception.toString().toLowerCase();
+          return errorStr.contains('429') || 
+                 errorStr.contains('too many requests') ||
+                 errorStr.contains('failed to fetch') ||
+                 errorStr.contains('clientexception');
+        },
       );
 
       if (response.statusCode != 200) {
@@ -551,12 +567,22 @@ class _HomePageState
       _addLog(
         "Rufe vollständige Verbindungsdetails mit dem Recon-String ab...",
       );
-      final reconResponse = await http
-          .post(
-            Uri.parse(reconUrl),
-            headers: fullHeaders,
-            body: json.encode(payload),
-          );
+      final reconResponse = await globalRateLimiter.executeWithRetry<http.Response>(
+        () => http.post(
+          Uri.parse(reconUrl),
+          headers: fullHeaders,
+          body: json.encode(payload),
+        ),
+        cacheKey: '${cacheKey}_step2',
+        shouldRetry: (exception) {
+          // Retry on rate limiting and network errors
+          final errorStr = exception.toString().toLowerCase();
+          return errorStr.contains('429') || 
+                 errorStr.contains('too many requests') ||
+                 errorStr.contains('failed to fetch') ||
+                 errorStr.contains('clientexception');
+        },
+      );
 
       // Accept 201 status code as success (Created)
       if (reconResponse.statusCode ==
@@ -588,23 +614,22 @@ class _HomePageState
                 "Status 201 erhalten, versuche erneuten Abruf der Verbindungsdaten...",
               );
 
-              // Wait a moment before retrying
-              await Future.delayed(
-                const Duration(
-                  milliseconds: 1000,
+              // Make a new request to get the connection data with rate limiting
+              final retryResponse = await globalRateLimiter.executeWithRetry<http.Response>(
+                () => http.post(
+                  Uri.parse(reconUrl),
+                  headers: fullHeaders,
+                  body: json.encode(payload),
                 ),
+                cacheKey: '${cacheKey}_retry',
+                shouldRetry: (exception) {
+                  final errorStr = exception.toString().toLowerCase();
+                  return errorStr.contains('429') || 
+                         errorStr.contains('too many requests') ||
+                         errorStr.contains('failed to fetch') ||
+                         errorStr.contains('clientexception');
+                },
               );
-
-              // Make a new request to get the connection data
-              final retryResponse =
-                  await http.post(
-                    Uri.parse(reconUrl),
-                    headers:
-                        fullHeaders,
-                    body: json.encode(
-                      payload,
-                    ),
-                  );
 
               if (retryResponse
                       .statusCode ==
@@ -691,11 +716,25 @@ class _HomePageState
           "application/json; charset=UTF-8",
     };
 
+    // Create cache key for this specific request
+    final cacheKey = 'connection_${fromStationId}_${toStationId}_${date}_${departureTime}_${travellerPayload.toString()}';
+
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: json.encode(payload),
+      final response = await globalRateLimiter.executeWithRetry<http.Response>(
+        () => http.post(
+          Uri.parse(url),
+          headers: headers,
+          body: json.encode(payload),
+        ),
+        cacheKey: cacheKey,
+        shouldRetry: (exception) {
+          // Retry on rate limiting and network errors
+          final errorStr = exception.toString().toLowerCase();
+          return errorStr.contains('429') || 
+                 errorStr.contains('too many requests') ||
+                 errorStr.contains('failed to fetch') ||
+                 errorStr.contains('clientexception');
+        },
       );
 
       // Accept both 200 and 201 status codes
@@ -722,22 +761,22 @@ class _HomePageState
                 "Status 201 erhalten, versuche erneuten Abruf...",
               );
 
-              // Wait a moment before retrying
-              await Future.delayed(
-                const Duration(
-                  milliseconds: 1000,
+              // Make a new request with rate limiting
+              final retryResponse = await globalRateLimiter.executeWithRetry<http.Response>(
+                () => http.post(
+                  Uri.parse(url),
+                  headers: headers,
+                  body: json.encode(payload),
                 ),
+                cacheKey: '${cacheKey}_retry',
+                shouldRetry: (exception) {
+                  final errorStr = exception.toString().toLowerCase();
+                  return errorStr.contains('429') || 
+                         errorStr.contains('too many requests') ||
+                         errorStr.contains('failed to fetch') ||
+                         errorStr.contains('clientexception');
+                },
               );
-
-              // Make a new request
-              final retryResponse =
-                  await http.post(
-                    Uri.parse(url),
-                    headers: headers,
-                    body: json.encode(
-                      payload,
-                    ),
-                  );
 
               if (retryResponse
                       .statusCode ==
@@ -780,14 +819,12 @@ class _HomePageState
       "Frage Daten an für: ${fromStop['name']} -> ${toStop['name']}...",
     );
 
-    final delayMs =
-        int.tryParse(
-          _delayController.text,
-        ) ??
-        500;
-    await Future.delayed(
-      Duration(milliseconds: delayMs),
-    ); // Rate limiting
+    // The new rate limiter handles delays automatically, but we can optionally
+    // add a user-configured extra delay for debugging purposes
+    final userDelayMs = int.tryParse(_delayController.text) ?? 0;
+    if (userDelayMs > 0) {
+      await Future.delayed(Duration(milliseconds: userDelayMs));
+    }
 
     final departureTimeStr =
         fromStop['departure_time'];
@@ -1192,7 +1229,8 @@ class _HomePageState
                         Expanded(
                           flex: 3,
                           child: DBTextField(
-                            label: 'Delay (ms)',
+                            label: 'Extra Delay (ms)',
+                            hintText: 'Optional additional delay (rate limiting is automatic)',
                             controller: _delayController,
                             keyboardType: TextInputType.number,
                           ),
