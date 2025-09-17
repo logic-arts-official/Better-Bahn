@@ -1,5 +1,6 @@
 # Better-Bahn - Python CLI Tool
 # Core split-ticket analysis logic for Deutsche Bahn journeys
+
 import argparse
 import json
 import os
@@ -376,16 +377,37 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
     print(f"Löse vbid '{vbid}' auf...")
     try:
         vbid_url = f"https://www.bahn.de/web/api/angebote/verbindung/{vbid}"
-        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        # Enhanced headers based on working browser requests - required for API access
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Accept-Language": "de",
+            "Accept-Encoding": "gzip, deflate",  # Remove br (brotli) to avoid decompression issues
+            "Origin": "https://www.bahn.de",
+            "Referer": "https://www.bahn.de/buchung/fahrplan/suche",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty",
+        }
+
         response = requests.get(vbid_url, headers=headers)
-        response.raise_for_status()
-        vbid_data = response.json()
+
+        if response.status_code != 200:
+            print(f"Fehler beim Abrufen der VBID-Daten: HTTP {response.status_code}")
+            return None
+
+        try:
+            vbid_data = response.json()
+        except ValueError as e:
+            print(f"Fehler beim Parsen der VBID-JSON: {e}")
+            return None
         recon_string = vbid_data.get("hinfahrtRecon")
         if not recon_string:
             print(
                 "Fehler: Konnte keinen 'hinfahrtRecon' aus der vbid-Antwort extrahieren."
             )
             return None
+
         recon_url = "https://www.bahn.de/web/api/angebote/recon"
         payload = {
             "klasse": "KLASSE_2",
@@ -393,10 +415,32 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
             "ctxRecon": recon_string,
             "deutschlandTicketVorhanden": deutschland_ticket,
         }
-        headers["Content-Type"] = "application/json; charset=UTF-8"
+
+        # Add Content-Type and correlation ID for POST request
+        import uuid
+
+        correlation_id = f"{uuid.uuid4()}_{uuid.uuid4()}"
+        headers.update(
+            {
+                "Content-Type": "application/json; charset=UTF-8",
+                "X-Correlation-Id": correlation_id,
+            }
+        )
+
         print("Rufe vollständige Verbindungsdetails mit dem Recon-String ab...")
         response = requests.post(recon_url, json=payload, headers=headers)
-        response.raise_for_status()
+
+        if response.status_code not in [200, 201]:
+            print(f"Fehler beim Abrufen der Recon-Daten: HTTP {response.status_code}")
+            if response.status_code == 403:
+                print(
+                    "Hinweis: 403 Forbidden deutet auf API-Zugriffsbeschränkungen hin."
+                )
+                print(
+                    "Mögliche Ursachen: Fehlende Header, Rate-Limiting oder veränderte API-Authentifizierung."
+                )
+            return None
+
         return response.json()
     except requests.RequestException as e:
         print(f"Fehler beim Auflösen der vbid '{vbid}': {e}")
