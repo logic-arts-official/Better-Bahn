@@ -1,6 +1,4 @@
-Hier ist die bereinigte, zusammengeführte Datei. Konfliktmarker entfernt. Nutzt das importierte `get_real_time_journey_info` und behält die erweiterten Masterdata-Funktionen.
 
-```python
 import argparse
 import json
 import os
@@ -675,4 +673,3 @@ if __name__ == "__main__":
         print(f"  - {stop['name']}")
 
     find_cheapest_split(all_stops, date_part, direct_price, traveller_payload, args)
-```
