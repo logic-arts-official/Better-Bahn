@@ -1,6 +1,5 @@
-Hier ist die bereinigte, zusammengeführte Datei. Konfliktmarker entfernt. Nutzt das importierte `get_real_time_journey_info` und behält die erweiterten Masterdata-Funktionen.
-
-```python
+# Better-Bahn - Python CLI Tool
+# Core split-ticket analysis logic for Deutsche Bahn journeys
 import argparse
 import json
 import os
@@ -14,7 +13,7 @@ from urllib.parse import parse_qs, urlparse, quote
 import requests
 import yaml
 
-from db_transport_api import DBTransportAPIClient, get_real_time_journey_info
+from db_transport_api import get_real_time_journey_info
 from departure_board import DepartureBoardService
 
 try:
@@ -675,4 +674,3 @@ if __name__ == "__main__":
         print(f"  - {stop['name']}")
 
     find_cheapest_split(all_stops, date_part, direct_price, traveller_payload, args)
-```
