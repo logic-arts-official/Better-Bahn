@@ -99,7 +99,7 @@ uv run python main.py --departure-board --station "Hamburg" --demo  # Test offli
 - Ruff auto-fixes any style issues and final check passes
 
 ### Expected Timeouts and Durations
-- **uv sync**: ~0.1 seconds (very fast!)
+- **uv sync**: ~0.1 seconds (very fast!; measured on modern SSD, may vary by system and environment)
 - **pip install uv**: ~4 seconds
 - **pip install ruff**: ~2 seconds  
 - **uv add pytest**: ~69ms (adding dependencies to uv project)
