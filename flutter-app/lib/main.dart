@@ -492,10 +492,17 @@ class _HomePageState
       // Step 1: Get the 'recon' string from the vbid endpoint
       final vbidUrl =
           "https://www.bahn.de/web/api/angebote/verbindung/$vbid";
+      // Enhanced headers based on working browser requests - required for API access
       final headers = {
         "User-Agent":
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "application/json",
+        "Accept-Language": "de",
+        "Origin": "https://www.bahn.de",
+        "Referer": "https://www.bahn.de/buchung/fahrplan/suche",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Dest": "empty",
       };
 
       final response = await http.get(
@@ -538,6 +545,7 @@ class _HomePageState
         ...headers,
         "Content-Type":
             "application/json; charset=UTF-8",
+        "X-Correlation-Id": "${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch}",
       };
 
       _addLog(
@@ -616,6 +624,14 @@ class _HomePageState
         _addLog(
           "Fehler beim Abrufen der Recon-Daten: ${reconResponse.statusCode}",
         );
+        if (reconResponse.statusCode == 403) {
+          _addLog(
+            "Hinweis: 403 Forbidden deutet auf API-Zugriffsbeschränkungen hin.",
+          );
+          _addLog(
+            "Mögliche Ursachen: Fehlende Header, Rate-Limiting oder veränderte API-Authentifizierung.",
+          );
+        }
       }
 
       return {};
