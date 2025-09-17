@@ -1,6 +1,3 @@
-Bereinigt, lauffähig, konfliktfrei. Drop-in ersetzen.
-
-```python
 """
 v6.db.transport.rest API Client for Better-Bahn
 
@@ -589,4 +586,3 @@ def _self_test() -> None:
 
 if __name__ == "__main__":
     _self_test()
-```

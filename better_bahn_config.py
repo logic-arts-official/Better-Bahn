@@ -45,8 +45,14 @@ class CacheConfig:
 class LoggingConfig:
     """Configuration for logging and metrics"""
     enable_metrics: bool = True
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"  # Developer default: DEBUG level and higher
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # File logging configuration
+    enable_file_logging: bool = True
+    log_file_path: str = "better_bahn.log"
+    log_file_max_size: int = 10 * 1024 * 1024  # 10MB
+    log_file_backup_count: int = 5
     
     # Metrics configuration
     track_latency: bool = True
@@ -98,6 +104,10 @@ class BetterBahnConfig:
             enable_metrics=os.getenv('BETTER_BAHN_METRICS', 'true').lower() == 'true',
             log_level=os.getenv('BETTER_BAHN_LOG_LEVEL', LoggingConfig.log_level),
             log_format=os.getenv('BETTER_BAHN_LOG_FORMAT', LoggingConfig.log_format),
+            enable_file_logging=os.getenv('BETTER_BAHN_FILE_LOGGING', 'true').lower() == 'true',
+            log_file_path=os.getenv('BETTER_BAHN_LOG_FILE', LoggingConfig.log_file_path),
+            log_file_max_size=int(os.getenv('BETTER_BAHN_LOG_MAX_SIZE', LoggingConfig.log_file_max_size)),
+            log_file_backup_count=int(os.getenv('BETTER_BAHN_LOG_BACKUP_COUNT', LoggingConfig.log_file_backup_count)),
             track_latency=os.getenv('BETTER_BAHN_TRACK_LATENCY', 'true').lower() == 'true',
             track_status_codes=os.getenv('BETTER_BAHN_TRACK_STATUS', 'true').lower() == 'true',
             track_cache_hits=os.getenv('BETTER_BAHN_TRACK_CACHE', 'true').lower() == 'true'
@@ -153,6 +163,10 @@ class BetterBahnConfig:
             enable_metrics=logging_data.get('enable_metrics', LoggingConfig.enable_metrics),
             log_level=logging_data.get('log_level', LoggingConfig.log_level),
             log_format=logging_data.get('log_format', LoggingConfig.log_format),
+            enable_file_logging=logging_data.get('enable_file_logging', LoggingConfig.enable_file_logging),
+            log_file_path=logging_data.get('log_file_path', LoggingConfig.log_file_path),
+            log_file_max_size=logging_data.get('log_file_max_size', LoggingConfig.log_file_max_size),
+            log_file_backup_count=logging_data.get('log_file_backup_count', LoggingConfig.log_file_backup_count),
             track_latency=logging_data.get('track_latency', LoggingConfig.track_latency),
             track_status_codes=logging_data.get('track_status_codes', LoggingConfig.track_status_codes),
             track_cache_hits=logging_data.get('track_cache_hits', LoggingConfig.track_cache_hits)
@@ -193,6 +207,10 @@ class BetterBahnConfig:
                 'enable_metrics': self.logging.enable_metrics,
                 'log_level': self.logging.log_level,
                 'log_format': self.logging.log_format,
+                'enable_file_logging': self.logging.enable_file_logging,
+                'log_file_path': self.logging.log_file_path,
+                'log_file_max_size': self.logging.log_file_max_size,
+                'log_file_backup_count': self.logging.log_file_backup_count,
                 'track_latency': self.logging.track_latency,
                 'track_status_codes': self.logging.track_status_codes,
                 'track_cache_hits': self.logging.track_cache_hits
@@ -206,22 +224,40 @@ class BetterBahnConfig:
             json.dump(data, f, indent=2)
     
     def setup_logging(self):
-        """Setup logging configuration"""
+        """Setup logging configuration with console and optional file logging"""
+        import logging.handlers
+        
         logger = logging.getLogger('better_bahn')
         logger.setLevel(getattr(logging, self.logging.log_level.upper()))
         
         # Clear existing handlers
         logger.handlers.clear()
         
-        # Create console handler
-        handler = logging.StreamHandler()
-        handler.setLevel(getattr(logging, self.logging.log_level.upper()))
-        
         # Create formatter
         formatter = logging.Formatter(self.logging.log_format)
-        handler.setFormatter(formatter)
         
-        logger.addHandler(handler)
+        # Create console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(getattr(logging, self.logging.log_level.upper()))
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        
+        # Create file handler with rotation if enabled
+        if self.logging.enable_file_logging:
+            try:
+                file_handler = logging.handlers.RotatingFileHandler(
+                    self.logging.log_file_path,
+                    maxBytes=self.logging.log_file_max_size,
+                    backupCount=self.logging.log_file_backup_count,
+                    encoding='utf-8'
+                )
+                file_handler.setLevel(getattr(logging, self.logging.log_level.upper()))
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+                logger.info(f"File logging enabled: {self.logging.log_file_path}")
+            except Exception as e:
+                logger.warning(f"Could not setup file logging: {e}")
+        
         return logger
 
 
