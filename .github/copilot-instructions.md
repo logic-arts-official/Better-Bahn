@@ -17,25 +17,32 @@ Better-Bahn is a dual-platform application for finding cheaper split-ticket opti
 ### Bootstrap and Setup
 - **Python 3.12** is required (check `.python-version`)
 - Install uv package manager: `pip install uv` (takes ~4 seconds)
-- Setup Python environment: `export PATH="$HOME/.local/bin:$PATH" && uv sync` (takes ~0.2 seconds)
+- Setup Python environment: `export PATH="$HOME/.local/bin:$PATH" && uv sync` (takes ~0.1 seconds)
 - **Flutter SDK 3.8.1+** required for mobile development
 
 ### Essential Commands
 
 #### Python CLI Development
-- **Help command**: `uv run main.py --help`
-- **Test with example URL**: `uv run main.py "https://www.bahn.de/buchung/start?vbid=9dd9db26-4ffc-411c-b79c-e82bf5338989" --age 30`
+
+> **Note:** The `uv run python main.py ...` command uses the explicit `python` prefix to ensure the script is run with the correct interpreter, especially in environments where `main.py` is not marked as executable or where `uv run main.py ...` may fail. If `uv run main.py ...` works in your environment, you may use the simpler form, but the explicit version is recommended for consistency.
+- **Help command**: `uv run python main.py --help`
+- **Test with example URL**: `uv run python main.py "https://www.bahn.de/buchung/start?vbid=9dd9db26-4ffc-411c-b79c-e82bf5338989" --age 30`
   - Expected: Network error in sandboxed environments, but command parsing works
+- **Test departure board demo**: `uv run python main.py --departure-board --station "Berlin" --demo` (works offline)
+- **Standalone departure board CLI**: `./departure_board_cli.py --help` (separate executable)
 - **Syntax check**: `python -m py_compile main.py`
 - **Install linting**: `pip install ruff` (takes ~2 seconds)
 - **Lint code**: `ruff check main.py` 
 - **Format code**: `ruff format main.py`
+- **Install tests**: `uv add pytest` (takes ~69ms)
+- **Run tests**: `uv run python -m pytest test_masterdata_loader.py -v` (13 tests in ~0.43 seconds)
 
 #### Flutter App Development  
 - **Change to Flutter directory**: `cd flutter-app`
-- **Install Flutter dependencies**: `flutter pub get` (NEVER CANCEL: takes 2-5 minutes)
-- **Run Flutter linting**: `flutter analyze` (takes ~30 seconds)
-- **Build for Android**: `flutter build apk` (NEVER CANCEL: takes 10-15 minutes. Set timeout to 30+ minutes)
+- **Install Flutter dependencies**: `flutter pub get` (NEVER CANCEL: takes ~5.5 seconds first time, 2-5 minutes on slower systems)
+- **Run Flutter linting**: `flutter analyze` (takes ~12 seconds)
+- **Build for Android (debug)**: `flutter build apk --debug` (NEVER CANCEL: takes ~4 minutes. Set timeout to 10+ minutes)
+- **Build for Android (release)**: `flutter build apk` (NEVER CANCEL: takes 10-15 minutes. Set timeout to 30+ minutes)
 - **Run app**: `flutter run` (requires Android emulator or device)
 
 **NOTE**: Flutter commands may fail in environments without proper SDK installation. Document network access requirements.
@@ -46,10 +53,11 @@ Better-Bahn is a dual-platform application for finding cheaper split-ticket opti
 After making any code changes, ALWAYS run:
 
 1. **Python CLI validation**:
-   - `uv run main.py --help` - Verify help text displays correctly
-   - `uv run main.py "invalid-url"` - Verify error handling works ("Der lange URL ist unvollständig.")
-   - `uv run main.py "https://www.bahn.de/buchung/start?vbid=test" --bahncard BC25_2 --deutschland-ticket` - Verify parameter parsing
-   - `uv run main.py "https://www.bahn.de/buchung/start?vbid=abc123" --age 25 --bahncard BC50_2 --deutschland-ticket` - Test all parameter combinations
+   - `uv run python main.py --help` - Verify help text displays correctly
+   - `uv run python main.py "invalid-url"` - Verify error handling works ("Der lange URL ist unvollständig.")
+   - `uv run python main.py "https://www.bahn.de/buchung/start?vbid=test" --bahncard BC25_2 --deutschland-ticket` - Verify parameter parsing
+   - `uv run python main.py "https://www.bahn.de/buchung/start?vbid=abc123" --age 25 --bahncard BC50_2 --deutschland-ticket` - Test all parameter combinations
+   - `uv run python main.py --departure-board --station "Berlin" --demo` - Test departure board demo mode
 
 2. **Code quality validation**:
    - `python -m py_compile main.py` - Check syntax (should complete silently)
@@ -59,10 +67,11 @@ After making any code changes, ALWAYS run:
    - Verify `ruff check main.py` passes after auto-fix
 
 3. **Flutter validation** (when modifying Flutter app):
-   - `cd flutter-app && flutter analyze` - Check Dart code quality
-   - `flutter pub get` - Ensure dependencies resolve
+   - `cd flutter-app && flutter analyze` - Check Dart code quality (~12 seconds)
+   - `flutter pub get` - Ensure dependencies resolve (~5.5 seconds)
    - Verify `pubspec.yaml` dependencies are compatible
    - Check that all asset paths exist (fonts in `assets/fonts/`, icons in `assets/icon/`)
+   - `flutter build apk --debug` - Test debug build (~4 minutes, NEVER CANCEL)
 
 ### Complete User Workflow Testing
 Run this complete scenario after making significant changes:
@@ -75,11 +84,12 @@ uv sync
 pip install ruff
 
 # Test workflow
-uv run main.py --help
-uv run main.py "https://www.bahn.de/buchung/start?vbid=test-vbid" --age 30 --bahncard BC25_1
+uv run python main.py --help
+uv run python main.py "https://www.bahn.de/buchung/start?vbid=test-vbid" --age 30 --bahncard BC25_1
 python -m py_compile main.py
 ruff check main.py --fix
 ruff check main.py  # Should pass after fix
+uv run python main.py --departure-board --station "Hamburg" --demo  # Test offline features
 ```
 
 **Expected Results**:
@@ -89,14 +99,18 @@ ruff check main.py  # Should pass after fix
 - Ruff auto-fixes any style issues and final check passes
 
 ### Expected Timeouts and Durations
-- **uv sync**: ~0.03 seconds (even faster than expected!)
+- **uv sync**: ~0.1 seconds (very fast!; measured on modern SSD, may vary by system and environment)
 - **pip install uv**: ~4 seconds
 - **pip install ruff**: ~2 seconds  
-- **flutter pub get**: 2-5 minutes (NEVER CANCEL - set timeout to 10+ minutes)
-- **flutter analyze**: ~30 seconds
-- **flutter build apk**: 10-15 minutes (NEVER CANCEL - set timeout to 30+ minutes)
+- **uv add pytest**: ~69ms (adding dependencies to uv project)
+- **flutter pub get**: typically 5-15 seconds on modern systems; may take 2-5 minutes on older hardware or slow networks (NEVER CANCEL - set timeout to 10+ minutes)
+- **flutter analyze**: ~12 seconds
+- **flutter build apk --debug**: ~4 minutes (debug build, faster than release)
+- **flutter build apk**: 10-15 minutes (release build, NEVER CANCEL - set timeout to 30+ minutes)
 - **ruff check/format**: ~0.01 seconds
-- **uv run main.py commands**: ~0.15 seconds (includes network error time)
+- **uv run python main.py commands**: ~0.6 seconds (includes masterdata loading and network error time)
+- **pytest test run**: ~0.43 seconds for 13 tests
+- **Complete workflow test**: ~1.2 seconds (full validation scenario)
 
 ## Project Structure
 
@@ -111,8 +125,11 @@ Better-Bahn/
 │   ├── pubspec.yaml      # Flutter dependencies
 │   ├── analysis_options.yaml # Flutter linting config
 │   └── android/          # Android build configuration
-├── testing/              # Test utilities
-│   └── shortlink.py      # API testing script
+├── departure_board_cli.py   # Standalone departure board CLI
+├── tests/              # Test utilities and unit tests
+│   ├── run_all_tests.py  # Test runner script
+│   └── test_*.py       # Individual test modules
+├── test_*.py           # Root-level test files (require pytest)
 ├── assets/              # App icons and screenshots
 ├── docs/                # Documentation (technical, user guides)
 ├── .github/
@@ -161,14 +178,16 @@ Better-Bahn/
 
 ### When changing main.py:
 - Always run `ruff check main.py` before committing
-- Test with `uv run main.py --help` to verify CLI still works
+- Test with `uv run python main.py --help` to verify CLI still works
 - Check that new BahnCard options follow existing pattern: `BC25_1`, `BC25_2`, `BC50_1`, `BC50_2`
+- Run related tests: `uv run python -m pytest test_masterdata_loader.py -v`
 
 ### When changing Flutter app:
 - Always run `cd flutter-app && flutter analyze`
 - Verify `pubspec.yaml` version constraints are compatible
 - Check that asset paths in `pubspec.yaml` are correct
-- Test that app builds: `flutter build apk` (allow 15+ minutes)
+- Test that app builds: `flutter build apk --debug` (allow 10+ minutes) or `flutter build apk` for release (allow 30+ minutes)
+- **CRITICAL**: NEVER CANCEL Flutter builds - they may take up to 15+ minutes but will complete successfully
 
 ### When updating documentation:
 - Check links in `docs/README.md` still work
@@ -182,7 +201,9 @@ Better-Bahn/
 - **BahnCard options**: Limited to BC25_1, BC25_2, BC50_1, BC50_2
 - **Deutschland-Ticket**: Boolean flag for ticket integration
 - **GitHub Pages**: Documentation automatically deployed via Jekyll
-- **No test suite**: Currently no unit tests (mentioned as "to be implemented" in CONTRIBUTING.md)
+- **Test infrastructure**: pytest-based tests exist (run with `uv add pytest` first)
+- **Executable scripts**: `departure_board_cli.py` for standalone departure board functionality
+- **Demo modes**: Both main CLI and departure board support `--demo` for offline testing
 
 ## Troubleshooting
 
@@ -194,6 +215,7 @@ Better-Bahn/
 5. **Flutter build failures**: Ensure proper Android SDK setup, allow 15+ minute timeouts
 6. **Import errors**: Check `pyproject.toml` dependencies and run `uv sync`
 7. **Permission errors**: Ensure PATH includes `$HOME/.local/bin` for user-installed packages
+8. **Test failures**: Run `uv add pytest` to install test dependencies, then `uv run python -m pytest test_*.py -v`
 
 ### Quick Fixes:
 - **Python syntax error**: `python -m py_compile main.py`
@@ -201,12 +223,14 @@ Better-Bahn/
 - **Flutter dependency error**: `cd flutter-app && flutter pub get`
 - **Formatting issues**: `ruff format main.py` then `ruff check main.py --fix`
 - **CLI parsing issues**: Check argparse configuration in main.py (lines 269-290)
+- **Test command**: Run `uv run python -m pytest test_masterdata_loader.py -v` to verify test infrastructure
 
 ### CI/CD and Automation Considerations:
-- **No automated testing**: Currently no unit tests or CI builds for Python code
+- **Test infrastructure exists**: pytest-based tests available - install with `uv add pytest`
 - **No Flutter CI**: Flutter builds must be done manually (no GitHub Actions workflow)
 - **Documentation only**: Only GitHub Pages deployment is automated (Jekyll from `docs/`)
 - **Manual validation required**: All changes require manual testing as documented above
 - **Sandboxed limitations**: Network requests to Deutsche Bahn APIs will always fail in CI environments
+- **Demo modes available**: Use `--demo` flags for offline testing and validation
 
 Remember: NEVER CANCEL long-running Flutter commands. They may take 15+ minutes but will complete successfully.

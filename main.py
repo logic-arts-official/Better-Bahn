@@ -1,3 +1,6 @@
+# Better-Bahn - Python CLI Tool
+# Core split-ticket analysis logic for Deutsche Bahn journeys
+
 import argparse
 import json
 import os
