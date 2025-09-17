@@ -11,11 +11,12 @@ from urllib.parse import parse_qs, urlparse, quote
 import requests
 import yaml
 
-from db_transport_api import DBTransportAPIClient, get_real_time_journey_info
+from db_transport_api import get_real_time_journey_info
 from departure_board import DepartureBoardService
 
 try:
     import jsonschema
+
     JSONSCHEMA_AVAILABLE = True
 except ImportError:
     JSONSCHEMA_AVAILABLE = False
@@ -24,10 +25,12 @@ except ImportError:
 
 # --- HILFSFUNKTIONEN ---
 
+
 def load_timetable_masterdata():
     """Lädt die statische Fahrplan-Masterdaten mit robuster Fallback-Logik."""
     try:
         from masterdata_loader import load_timetable_masterdata as load_masterdata_typed
+
         masterdata_obj = load_masterdata_typed()
         return masterdata_obj.raw_data
     except ImportError:
@@ -36,7 +39,9 @@ def load_timetable_masterdata():
         try:
             with open(yaml_path, "r", encoding="utf-8") as file:
                 masterdata = yaml.safe_load(file)
-                print(f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})")
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
                 return masterdata
         except FileNotFoundError:
             print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
@@ -55,7 +60,9 @@ def load_timetable_masterdata():
         try:
             with open(yaml_path, "r", encoding="utf-8") as file:
                 masterdata = yaml.safe_load(file)
-                print(f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})")
+                print(
+                    f"✓ Fahrplan-Masterdaten geladen (Version: {masterdata.get('info', {}).get('version', 'unbekannt')})"
+                )
                 return masterdata
         except FileNotFoundError:
             print(f"⚠️ Warnung: Fahrplan-Masterdaten nicht gefunden unter {yaml_path}")
@@ -71,7 +78,11 @@ def load_timetable_masterdata():
 def get_station_schema():
     """Gibt das Schema für Stationsdaten aus den Masterdaten zurück."""
     masterdata = load_timetable_masterdata()
-    if masterdata and "components" in masterdata and "schemas" in masterdata["components"]:
+    if (
+        masterdata
+        and "components" in masterdata
+        and "schemas" in masterdata["components"]
+    ):
         return masterdata["components"]["schemas"]
     return None
 
@@ -88,6 +99,7 @@ def validate_eva_number(eva_no):
 
 
 # --- ERWEITERTE MASTERDATA-FUNKTIONEN ---
+
 
 def load_masterdata_schema():
     """Lädt das JSON-Schema für Masterdata-Validierung."""
@@ -116,7 +128,9 @@ def load_timetables_version():
     try:
         with open(version_path, "r", encoding="utf-8") as file:
             version_info = json.load(file)
-            print(f"✓ Timetables-Version geladen: {version_info.get('version', 'Unbekannt')}")
+            print(
+                f"✓ Timetables-Version geladen: {version_info.get('version', 'Unbekannt')}"
+            )
             return version_info
     except FileNotFoundError:
         print(f"⚠️ Warnung: Versionsinformationen nicht gefunden unter {version_path}")
@@ -198,9 +212,14 @@ def validate_service_data(service_data):
         if not service_schema:
             return False, ["Service-Schema nicht im Masterdata-Schema gefunden"]
 
-        resolver = jsonschema.RefResolver(base_uri=schema.get("$id", ""), referrer=schema)
+        resolver = jsonschema.RefResolver(
+            base_uri=schema.get("$id", ""), referrer=schema
+        )
         validator = jsonschema.Draft202012Validator(service_schema, resolver=resolver)
-        validation_errors = [f"Schema-Validierungsfehler: {e.message}" for e in validator.iter_errors(service_data)]
+        validation_errors = [
+            f"Schema-Validierungsfehler: {e.message}"
+            for e in validator.iter_errors(service_data)
+        ]
         if validation_errors:
             return False, validation_errors
 
@@ -208,7 +227,9 @@ def validate_service_data(service_data):
         stops = service_data.get("stops", [])
         for i, stop in enumerate(stops):
             if stop.get("sequence") != i:
-                errors.append(f"Stop-Sequenz stimmt nicht überein: erwartet {i}, gefunden {stop.get('sequence')}")
+                errors.append(
+                    f"Stop-Sequenz stimmt nicht überein: erwartet {i}, gefunden {stop.get('sequence')}"
+                )
         for stop in stops:
             arrival = stop.get("arrival_planned")
             departure = stop.get("departure_planned")
@@ -217,9 +238,13 @@ def validate_service_data(service_data):
                     at = datetime.fromisoformat(arrival.replace("Z", "+00:00"))
                     dt = datetime.fromisoformat(departure.replace("Z", "+00:00"))
                     if dt < at:
-                        errors.append(f"Abfahrt vor Ankunft in Stop {stop.get('sequence', '?')}")
+                        errors.append(
+                            f"Abfahrt vor Ankunft in Stop {stop.get('sequence', '?')}"
+                        )
                 except ValueError:
-                    errors.append(f"Ungültiges Zeitformat in Stop {stop.get('sequence', '?')}")
+                    errors.append(
+                        f"Ungültiges Zeitformat in Stop {stop.get('sequence', '?')}"
+                    )
         return len(errors) == 0, errors
     except Exception as e:
         return False, [f"Unerwarteter Validierungsfehler: {str(e)}"]
@@ -251,7 +276,11 @@ def update_timetables_version(stats=None):
         {
             "file_sha256": file_hash or "hash_computation_failed",
             "generated_at": now,
-            "statistics": stats or version_info.get("statistics", {"total_stations": 0, "total_services": 0, "last_updated": now}),
+            "statistics": stats
+            or version_info.get(
+                "statistics",
+                {"total_stations": 0, "total_services": 0, "last_updated": now},
+            ),
         }
     )
     try:
@@ -298,7 +327,9 @@ def precompute_adjacency_data(stations, services):
         "total_stations": len(adjacency_lists),
         "total_segments": len(route_segments),
     }
-    print(f"✓ Adjazenz-Daten berechnet: {len(adjacency_lists)} Stationen, {len(route_segments)} Segmente")
+    print(
+        f"✓ Adjazenz-Daten berechnet: {len(adjacency_lists)} Stationen, {len(route_segments)} Segmente"
+    )
     return routing_data
 
 
@@ -310,7 +341,14 @@ def create_traveller_payload(age, bahncard_option):
         bc_art = f"BAHNCARD{bc_typ_str[2:]}"
         k_art = f"KLASSE_{klasse_str}"
         ermaessigung = {"art": bc_art, "klasse": k_art}
-    return [{"typ": "ERWACHSENER", "ermaessigungen": [ermaessigung], "anzahl": 1, "alter": []}]
+    return [
+        {
+            "typ": "ERWACHSENER",
+            "ermaessigungen": [ermaessigung],
+            "anzahl": 1,
+            "alter": [],
+        }
+    ]
 
 
 def enhance_connection_with_real_time(connection_data, real_time_info):
@@ -330,6 +368,7 @@ def enhance_connection_with_real_time(connection_data, real_time_info):
 
 # --- API-FUNKTIONEN ---
 
+
 def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
     """Löst einen kurzen vbid-Link auf, um die vollständigen Verbindungsdetails zu erhalten."""
     print(f"Löse vbid '{vbid}' auf...")
@@ -347,13 +386,13 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
         }
-        
+
         response = requests.get(vbid_url, headers=headers)
-        
+
         if response.status_code != 200:
             print(f"Fehler beim Abrufen der VBID-Daten: HTTP {response.status_code}")
             return None
-            
+
         try:
             vbid_data = response.json()
         except ValueError as e:
@@ -361,9 +400,11 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
             return None
         recon_string = vbid_data.get("hinfahrtRecon")
         if not recon_string:
-            print("Fehler: Konnte keinen 'hinfahrtRecon' aus der vbid-Antwort extrahieren.")
+            print(
+                "Fehler: Konnte keinen 'hinfahrtRecon' aus der vbid-Antwort extrahieren."
+            )
             return None
-            
+
         recon_url = "https://www.bahn.de/web/api/angebote/recon"
         payload = {
             "klasse": "KLASSE_2",
@@ -371,32 +412,46 @@ def resolve_vbid_to_connection(vbid, traveller_payload, deutschland_ticket):
             "ctxRecon": recon_string,
             "deutschlandTicketVorhanden": deutschland_ticket,
         }
-        
+
         # Add Content-Type and correlation ID for POST request
         import uuid
+
         correlation_id = f"{uuid.uuid4()}_{uuid.uuid4()}"
-        headers.update({
-            "Content-Type": "application/json; charset=UTF-8",
-            "X-Correlation-Id": correlation_id,
-        })
-        
+        headers.update(
+            {
+                "Content-Type": "application/json; charset=UTF-8",
+                "X-Correlation-Id": correlation_id,
+            }
+        )
+
         print("Rufe vollständige Verbindungsdetails mit dem Recon-String ab...")
         response = requests.post(recon_url, json=payload, headers=headers)
-        
+
         if response.status_code not in [200, 201]:
             print(f"Fehler beim Abrufen der Recon-Daten: HTTP {response.status_code}")
             if response.status_code == 403:
-                print("Hinweis: 403 Forbidden deutet auf API-Zugriffsbeschränkungen hin.")
-                print("Mögliche Ursachen: Fehlende Header, Rate-Limiting oder veränderte API-Authentifizierung.")
+                print(
+                    "Hinweis: 403 Forbidden deutet auf API-Zugriffsbeschränkungen hin."
+                )
+                print(
+                    "Mögliche Ursachen: Fehlende Header, Rate-Limiting oder veränderte API-Authentifizierung."
+                )
             return None
-            
+
         return response.json()
     except requests.RequestException as e:
         print(f"Fehler beim Auflösen der vbid '{vbid}': {e}")
         return None
 
 
-def get_connection_details(from_station_id, to_station_id, date, departure_time, traveller_payload, deutschland_ticket):
+def get_connection_details(
+    from_station_id,
+    to_station_id,
+    date,
+    departure_time,
+    traveller_payload,
+    deutschland_ticket,
+):
     """Ruft Verbindungsdetails ab (für lange URLs oder Teilstrecken)."""
     url = "https://www.bahn.de/web/api/angebote/fahrplan"
     payload = {
@@ -405,12 +460,27 @@ def get_connection_details(from_station_id, to_station_id, date, departure_time,
         "ankunftsHalt": to_station_id,
         "ankunftSuche": "ABFAHRT",
         "klasse": "KLASSE_2",
-        "produktgattungen": ["ICE", "EC_IC", "IR", "REGIONAL", "SBAHN", "BUS", "SCHIFF", "UBAHN", "TRAM", "ANRUFPFLICHTIG"],
+        "produktgattungen": [
+            "ICE",
+            "EC_IC",
+            "IR",
+            "REGIONAL",
+            "SBAHN",
+            "BUS",
+            "SCHIFF",
+            "UBAHN",
+            "TRAM",
+            "ANRUFPFLICHTIG",
+        ],
         "reisende": traveller_payload,
         "schnelleVerbindungen": True,
         "deutschlandTicketVorhanden": deutschland_ticket,
     }
-    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json", "Content-Type": "application/json; charset=UTF-8"}
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json",
+        "Content-Type": "application/json; charset=UTF-8",
+    }
     try:
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
@@ -425,7 +495,14 @@ def get_segment_data(from_stop, to_stop, date, traveller_payload, deutschland_ti
     departure_time_str = from_stop["departure_time"]
     if not departure_time_str:
         return None
-    connections = get_connection_details(from_stop["id"], to_stop["id"], date, departure_time_str, traveller_payload, deutschland_ticket)
+    connections = get_connection_details(
+        from_stop["id"],
+        to_stop["id"],
+        date,
+        departure_time_str,
+        traveller_payload,
+        deutschland_ticket,
+    )
     if connections and connections.get("verbindungen"):
         first_connection = connections["verbindungen"][0]
         price = first_connection.get("angebotsPreis", {}).get("betrag")
@@ -487,6 +564,7 @@ def generate_booking_link(segment, bahncard_option, has_d_ticket):
 
 # --- ANALYSE-FUNKTION ---
 
+
 def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
     """Findet die günstigste Kombination von Tickets und generiert Links."""
     n = len(stops)
@@ -495,8 +573,14 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
     for i in range(n):
         for j in range(i + 1, n):
             from_stop, to_stop = stops[i], stops[j]
-            print(f"Frage Daten an für: {from_stop['name']} -> {to_stop['name']}...", end="", flush=True)
-            data = get_segment_data(from_stop, to_stop, date, traveller_payload, args.deutschland_ticket)
+            print(
+                f"Frage Daten an für: {from_stop['name']} -> {to_stop['name']}...",
+                end="",
+                flush=True,
+            )
+            data = get_segment_data(
+                from_stop, to_stop, date, traveller_payload, args.deutschland_ticket
+            )
             if data:
                 segments_data[(i, j)] = data
     dp = [float("inf")] * n
@@ -529,9 +613,13 @@ def find_cheapest_split(stops, date, direct_price, traveller_payload, args):
         print("\nEmpfohlene Tickets zum Buchen:")
         for idx, segment in enumerate(path, 1):
             if segment:
-                print(f"  Ticket {idx}: Von {segment['start_name']} nach {segment['end_name']} für {segment['price']:.2f} €")
+                print(
+                    f"  Ticket {idx}: Von {segment['start_name']} nach {segment['end_name']} für {segment['price']:.2f} €"
+                )
                 if segment["price"] > 0:
-                    link = generate_booking_link(segment, args.bahncard, args.deutschland_ticket)
+                    link = generate_booking_link(
+                        segment, args.bahncard, args.deutschland_ticket
+                    )
                     print(f"      -> Buchungslink: {link}")
                 else:
                     print("      -> (Fahrt durch Deutschland-Ticket abgedeckt)")
@@ -547,22 +635,49 @@ if __name__ == "__main__":
         description="Findet günstigere Split-Tickets für eine DB-Verbindung und generiert Buchungslinks.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument("url", nargs='?', help="Der vollständige URL (lang oder kurz mit vbid) von bahn.de")
-    parser.add_argument("--age", type=int, default=30, help="Alter des Reisenden (Standard: 30).")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        help="Der vollständige URL (lang oder kurz mit vbid) von bahn.de",
+    )
+    parser.add_argument(
+        "--age", type=int, default=30, help="Alter des Reisenden (Standard: 30)."
+    )
     parser.add_argument(
         "--bahncard",
         choices=["BC25_1", "BC25_2", "BC50_1", "BC50_2"],
         help="Wählen Sie eine BahnCard-Option:\nBC25_1, BC25_2, BC50_1, BC50_2",
     )
-    parser.add_argument("--deutschland-ticket", action="store_true", help="Deutschland-Ticket vorhanden.")
     parser.add_argument(
-        "--real-time", action="store_true", default=True,
+        "--deutschland-ticket",
+        action="store_true",
+        help="Deutschland-Ticket vorhanden.",
+    )
+    parser.add_argument(
+        "--real-time",
+        action="store_true",
+        default=True,
         help="Echtzeit-Daten über v6.db.transport.rest API abrufen (Standard: aktiviert).",
     )
-    parser.add_argument("--no-real-time", dest="real_time", action="store_false", help="Echtzeit-Daten deaktivieren.")
-    parser.add_argument("--departure-board", action="store_true", help="Abfahrtstafel anzeigen (erfordert --station)")
-    parser.add_argument("--station", help="Bahnhof für Abfahrtstafel (Name oder EVA-Nummer)")
-    parser.add_argument("--demo", action="store_true", help="Demo-Modus für Abfahrtstafel mit Beispieldaten")
+    parser.add_argument(
+        "--no-real-time",
+        dest="real_time",
+        action="store_false",
+        help="Echtzeit-Daten deaktivieren.",
+    )
+    parser.add_argument(
+        "--departure-board",
+        action="store_true",
+        help="Abfahrtstafel anzeigen (erfordert --station)",
+    )
+    parser.add_argument(
+        "--station", help="Bahnhof für Abfahrtstafel (Name oder EVA-Nummer)"
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo-Modus für Abfahrtstafel mit Beispieldaten",
+    )
 
     args = parser.parse_args()
 
@@ -570,7 +685,9 @@ if __name__ == "__main__":
     if args.departure_board:
         if not args.station and not args.demo:
             print("❌ Fehler: --departure-board erfordert --station oder --demo")
-            print("💡 Beispiel: main.py 'dummy_url' --departure-board --station 'Berlin Hbf'")
+            print(
+                "💡 Beispiel: main.py 'dummy_url' --departure-board --station 'Berlin Hbf'"
+            )
             print("💡 Oder Demo: main.py 'dummy_url' --departure-board --demo")
             raise SystemExit(1)
 
@@ -580,7 +697,9 @@ if __name__ == "__main__":
 
         if args.demo:
             print("🎭 Demo-Modus aktiviert - Zeige Beispieldaten")
-            board = departure_service.create_demo_departure_board(args.station or "Berlin Hbf")
+            board = departure_service.create_demo_departure_board(
+                args.station or "Berlin Hbf"
+            )
         else:
             station_id = args.station
             if not args.station.isdigit():
@@ -589,13 +708,15 @@ if __name__ == "__main__":
                 if not station_info:
                     print(f"❌ Station '{args.station}' nicht gefunden.")
                     raise SystemExit(1)
-                station_id = station_info['id']
+                station_id = station_info["id"]
                 print(f"✓ Station gefunden: {station_info['name']} (EVA: {station_id})")
             print(f"\n📡 Lade Abfahrtsdaten für Station {station_id}...")
             board = departure_service.create_departure_board(station_id=station_id)
 
         if board:
-            print("\n" + departure_service.format_departure_board(board, max_entries=15))
+            print(
+                "\n" + departure_service.format_departure_board(board, max_entries=15)
+            )
         else:
             print("❌ Keine Abfahrtsdaten verfügbar.")
         raise SystemExit(0)
@@ -623,9 +744,13 @@ if __name__ == "__main__":
     if "vbid=" in url_to_parse:
         print("--- Kurzer Link (vbid) erkannt ---")
         vbid = parse_qs(urlparse(url_to_parse).query)["vbid"][0]
-        connection_data = resolve_vbid_to_connection(vbid, traveller_payload, args.deutschland_ticket)
+        connection_data = resolve_vbid_to_connection(
+            vbid, traveller_payload, args.deutschland_ticket
+        )
         if connection_data:
-            first_stop_departure = connection_data["verbindungen"][0]["verbindungsAbschnitte"][0]["halte"][0]["abfahrtsZeitpunkt"]
+            first_stop_departure = connection_data["verbindungen"][0][
+                "verbindungsAbschnitte"
+            ][0]["halte"][0]["abfahrtsZeitpunkt"]
             date_part = first_stop_departure.split("T")[0]
     else:
         print("--- Langer Link erkannt ---")
@@ -633,9 +758,20 @@ if __name__ == "__main__":
         if not all(k in params for k in ["soid", "zoid", "hd"]):
             print("Fehler: Der lange URL ist unvollständig.")
             raise SystemExit(1)
-        from_station_id, to_station_id, datetime_str = (params["soid"][0], params["zoid"][0], params["hd"][0])
+        from_station_id, to_station_id, datetime_str = (
+            params["soid"][0],
+            params["zoid"][0],
+            params["hd"][0],
+        )
         date_part, time_part = datetime_str.split("T")
-        connection_data = get_connection_details(from_station_id, to_station_id, date_part, time_part, traveller_payload, args.deutschland_ticket)
+        connection_data = get_connection_details(
+            from_station_id,
+            to_station_id,
+            date_part,
+            time_part,
+            traveller_payload,
+            args.deutschland_ticket,
+        )
 
     if not connection_data or not connection_data.get("verbindungen"):
         print("Konnte keine Verbindungsdetails für den angegebenen Link abrufen.")
@@ -645,24 +781,48 @@ if __name__ == "__main__":
     if args.real_time:
         print("\n--- Integriere Echtzeit-Daten ---")
         first_connection = connection_data["verbindungen"][0]
-        if "verbindungsAbschnitte" in first_connection and first_connection["verbindungsAbschnitte"]:
-            start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0]["bahnhofsName"]
-            end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1]["bahnhofsName"]
+        if (
+            "verbindungsAbschnitte" in first_connection
+            and first_connection["verbindungsAbschnitte"]
+        ):
+            start_station = first_connection["verbindungsAbschnitte"][0]["halte"][0][
+                "bahnhofsName"
+            ]
+            end_station = first_connection["verbindungsAbschnitte"][-1]["halte"][-1][
+                "bahnhofsName"
+            ]
             print(f"🔍 Suche Echtzeit-Daten für: {start_station} → {end_station}")
             real_time_info = get_real_time_journey_info(start_station, end_station)
-            connection_data = enhance_connection_with_real_time(connection_data, real_time_info)
-            if real_time_info and real_time_info.get('available'):
-                print(f"✓ Echtzeit-Daten integriert ({real_time_info['journeys_count']} Verbindungen)")
-                if real_time_info['journeys']:
-                    rt_status = real_time_info['journeys'][0]['real_time_status']
-                    if rt_status['has_delays']:
-                        print(f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten")
-                    if rt_status.get('has_cancellations') or rt_status.get('cancelled_legs', 0) > 0:
+            connection_data = enhance_connection_with_real_time(
+                connection_data, real_time_info
+            )
+            if real_time_info and real_time_info.get("available"):
+                print(
+                    f"✓ Echtzeit-Daten integriert ({real_time_info['journeys_count']} Verbindungen)"
+                )
+                if real_time_info["journeys"]:
+                    rt_status = real_time_info["journeys"][0]["real_time_status"]
+                    if rt_status["has_delays"]:
+                        print(
+                            f"⚠️  Aktuelle Verspätungen: {rt_status['total_delay_minutes']} Minuten"
+                        )
+                    if (
+                        rt_status.get("has_cancellations")
+                        or rt_status.get("cancelled_legs", 0) > 0
+                    ):
                         print("❌ Ausfälle: Teilstrecken betroffen")
-                    if not rt_status['has_delays'] and not rt_status.get('has_cancellations', False) and rt_status.get('cancelled_legs', 0) == 0:
+                    if (
+                        not rt_status["has_delays"]
+                        and not rt_status.get("has_cancellations", False)
+                        and rt_status.get("cancelled_legs", 0) == 0
+                    ):
                         print("✅ Aktuell keine Verspätungen oder Ausfälle")
             else:
-                error_msg = real_time_info.get('error', 'Unbekannter Fehler') if real_time_info else 'Keine Antwort'
+                error_msg = (
+                    real_time_info.get("error", "Unbekannter Fehler")
+                    if real_time_info
+                    else "Keine Antwort"
+                )
                 print(f"⚠️ Echtzeit-Daten momentan nicht verfügbar: {error_msg}")
                 print("🔄 Fallback auf bahn.de Basisdaten")
         else:
@@ -696,8 +856,16 @@ if __name__ == "__main__":
                         {
                             "name": halt["name"],
                             "id": halt["id"],
-                            "departure_time": halt.get("abfahrtsZeitpunkt", "").split("T")[-1] if halt.get("abfahrtsZeitpunkt") else "",
-                            "arrival_time": halt.get("ankunftsZeitpunkt", "").split("T")[-1] if halt.get("ankunftsZeitpunkt") else "",
+                            "departure_time": halt.get("abfahrtsZeitpunkt", "").split(
+                                "T"
+                            )[-1]
+                            if halt.get("abfahrtsZeitpunkt")
+                            else "",
+                            "arrival_time": halt.get("ankunftsZeitpunkt", "").split(
+                                "T"
+                            )[-1]
+                            if halt.get("ankunftsZeitpunkt")
+                            else "",
                         }
                     )
     if all_stops:
